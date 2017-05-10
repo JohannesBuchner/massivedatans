@@ -2,6 +2,7 @@ import numpy
 import matplotlib.pyplot as plt
 import h5py
 from numpy import exp
+import sys
 
 def gauss(x, z, A, mu, sig):
 	xT = x.reshape((1,-1))
@@ -14,9 +15,11 @@ def gauss(x, z, A, mu, sig):
 x = numpy.linspace(400, 800, 1000)
 
 N = 40
+N = int(sys.argv[1])
 numpy.random.seed(1)
 z = numpy.zeros(N) + 0.01
 rest_wave = 440
+print 'generating parameters ...'
 # in km/s
 width_broad = 10**3 * rest_wave / 300000 * numpy.ones(N)
 width_narrow = 10**1 * rest_wave / 300000 * numpy.ones(N)
@@ -25,7 +28,7 @@ mean_broad  = rest_wave * numpy.ones(N)
 mean_narrow = rest_wave * numpy.ones(N)
 width_broad = width_broad
 width_narrow = width_narrow
-noise_level = 0.01
+noise_level = 0.4
 #signal_level = numpy.random.exponential(size=N) * 10
 signal_level = numpy.ones(N) * 10
 #is_type1 = numpy.random.uniform(size=N) < 0.5
@@ -34,14 +37,18 @@ height_narrow = signal_level
 
 #X = numpy.array([x])
 
+print 'generating signal ...'
 ym =  gauss(A=height_broad, mu=mean_broad, x=x, z=z, sig=width_broad)
 ym += gauss(A=height_narrow, mu=mean_narrow, x=x, z=z, sig=width_narrow)
 ym = numpy.transpose(ym)
 print ym.shape
 
 # add noise
-print 'adding noise'
-y = numpy.random.normal(0, noise_level, size=ym.shape) + ym
+print 'adding noise...'
+y = ym.copy()
+for i in range(N):
+	y[:,i] += numpy.random.normal(0, noise_level, size=len(x))
+
 print 'plotting ...'
 for i in range(min(N, 20)):
 	#plt.plot(x, y[:,i], '.-')
@@ -49,8 +56,8 @@ for i in range(min(N, 20)):
 plt.savefig('gen.pdf', bbox_inches='tight')
 plt.close()
 
-print x.shape, y.shape, z.shape
-with h5py.File('data.hdf5', 'w') as f:
+#print x.shape, y.shape, z.shape
+with h5py.File('data_%s.hdf5' % sys.argv[1], 'w') as f:
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('y', data=y, compression='gzip', shuffle=True)
 	f.create_dataset('z', data=z, compression='gzip', shuffle=True)

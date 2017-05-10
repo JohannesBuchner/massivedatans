@@ -1,0 +1,81 @@
+# ndata	runtime	ndraws	logZ
+# 200
+1	5	253598	-500
+1	0.1	495	-22701.6	
+4	0.2	463	-22955.9
+10	0.3	611
+40	27	372383
+100	51	367337	-534.8
+
+# 400
+1	7.6	360757	-503
+1	11.5	444393	-503.8
+10	26	561380	-509.6
+100	130.6	681901	-534.7
+
+# simpler problem, noise 0.4
+# first line is single run
+# ndata	runtime	ndraws	logZ	niter
+0.99	0.25	1094	-493.5
+1	0.5	1111	-493.5	496
+4	62	1647374	-524.9	
+4				>1200
+
+# safer: rebuild every time
+1	3.3	170117	-491.6	2399
+1	12.6	223348	-491.7	2501
+4	42	2481952	-524.9	3799
+4	151	2117191	-524.7	3530
+
+# after fixing data generation issue:
+# ndata	runtime	ndraws	logZ	niter
+1	1.8	1109	-493	457
+4	258	8059503	-492.1	3968
+4	308	7990226	-492.3	3886
+10	850	5817330	-492.2	3689
+10	895	5876300	-492.3	3691
+100	
+1000
+
+# after speed ups
+# SUPERSET_DRAWS=10
+# ndata	runtime	ndraws	logZ	niter
+1	3	183852	-491.5	2380
+4	103	5373590	-492.4	3803
+10	190	9303697	-492.3	3906
+100	972	23239550	-492.2	3837
+
+
+# SUPERSET_DRAWS=1
+# ndata	runtime	ndraws	logZ	niter
+1	3	183852	-491.5	2380
+4	286	12341462	-492.4	3983
+10	372	21407376	-492.3	4104
+
+# more stringent criterion when adding to queues (should not affect output or performance)
+# put threshold on radfriends to not sample indefinitely -- 1000 draws
+# SUPERSET_DRAWS=10
+# ndata	runtime	ndraws	logZ	niter
+1	0.2	1096	-493.5	502
+1	3	183852	-491.5	2380
+4	77	2994147	-492.2	3886
+10	139	5929254	-492.2	3889
+
+
+# Accelerations with C
+1	0.1	1096	-493.5	502
+4	71	3696081	-492.3	3838
+10	103	3887450	-492.3	3903
+100	?	?	?	?
+1000	?	?	?	?
+
+# On nano
+# ndata	runtime[s]	ndraws	logZ	niter
+1	1.82	1096	-493.5	502
+4	1202	3696081	-492.3	3838
+10	2056.91	3887450	-492.3	3903
+100	?	?	?	?
+1000	?	?	?	?
+
+
+
