@@ -50,11 +50,13 @@ class MultiNestedSampler(object):
 		self.nlive_points = nlive_points
 		self.nsuperset_draws = nsuperset_draws
 		self.priortransform = priortransform
+		self.real_multi_loglikelihood = multi_loglikelihood
 		self.multi_loglikelihood = multi_loglikelihood
 		self.superset_draw_constrained = superset_draw_constrained
 		self.draw_constrained = draw_constrained
 		self.samples = []
 		self.ndim = ndim
+		self.ndata = ndata
 		if ndim is not None:
 			self.draw_global_uniform = lambda: numpy.random.uniform(0, 1, size=ndim)
 		else:
@@ -85,11 +87,11 @@ class MultiNestedSampler(object):
 		self.live_pointsx = numpy.array(live_pointsx)
 		self.live_pointsL = numpy.array(live_pointsL)
 		self.Lmax = self.live_pointsL.max(axis=0)
+		self.data_mask_all = numpy.ones(self.ndata) == 1
+		self.real_data_mask_all = numpy.ones(self.ndata) == 1
 		assert self.Lmax.shape == (ndata,)
 		self.ndraws = nlive_points
 		self.shelves = [[] for _ in range(ndata)]
-		self.ndata = ndata
-		self.data_mask_all = numpy.ones(self.ndata) == 1
 	
 	def get_unique_points(self, allpoints):
 		d = allpoints.reshape((-1,self.ndim))
@@ -137,7 +139,25 @@ class MultiNestedSampler(object):
 		return all_global_live_pointsu, all_Lmin, Lmins, Lmini
 	
 	def shelf_status(self):
-		print 'shelf status: %s' % ''.join([status_symbols.get(len(shelf), 'X') for shelf in self.shelves])
+		print ('shelf status: %s' % ''.join([status_symbols.get(len(shelf), 'X') for shelf in self.shelves])).encode('utf-8')
+	
+	def cut_down(self, surviving):
+		# delete some data sets
+		self.live_pointsp = self.live_pointsp[:,surviving]
+		self.live_pointsu = self.live_pointsu[:,surviving]
+		self.live_pointsx = self.live_pointsx[:,surviving]
+		self.live_pointsL = self.live_pointsL[:,surviving]
+		self.shelves = [shelf for s, shelf in zip(surviving, self.shelves) if s]
+		self.ndata = surviving.sum()
+		self.Lmax = self.live_pointsL.max(axis=0)
+		self.data_mask_all = numpy.ones(self.ndata) == 1
+		self.real_data_mask_all[self.real_data_mask_all] = surviving
+		def multi_loglikelihood_subset(params, mask):
+			subset_mask = self.real_data_mask_all.copy()
+			subset_mask[subset_mask] = mask
+			return self.real_multi_loglikelihood(params, subset_mask)
+			
+		self.multi_loglikelihood = multi_loglikelihood_subset
 	
 	def __next__(self):
 		live_pointsp = self.live_pointsp
@@ -283,29 +303,24 @@ class MultiNestedSampler(object):
 		#print 'Lmax:', self.Lmax
 		assert self.Lmax.shape == (self.ndata,)
 		self.samples.append([ujs, xjs, Ljs])
-		return uis, xis, Lis
+		return numpy.asarray(uis), numpy.asarray(xis), numpy.asarray(Lis)
 	
-	def remainder(self):
-		indices = [] #numpy.empty((self.ndata, self.nlive_points))
-		#indices = self.live_pointsL.argsort(axis=0)
-		#assert indices.shape == (self.ndata, self.nlive_points), (indices.shape, (self.ndata, self.nlive_points))
-		for d in range(self.ndata):
-			i = numpy.argsort(self.live_pointsL[:,d]) #[L[d] for L in self.live_pointsL])
-			#indices[d] = i
-			indices.append(i)
-		#indices = numpy.array(indices)
-		#indices2 = numpy.argsort(self.live_pointsL, axis=1)
-		#assert numpy.all(indices == indices2)
-		for i in range(self.nlive_points):
-			#j = indices[i,:]
-			#yield self.live_pointsu[i,:], self.live_pointsx[i,:], self.live_pointsL[i,:]
-			u = [self.live_pointsu[indices[d][i],d] for d in range(self.ndata)]
-			x = [self.live_pointsx[indices[d][i],d] for d in range(self.ndata)]
-			L = [self.live_pointsL[indices[d][i],d] for d in range(self.ndata)]
-			#print 'remainder:', i, L
-			yield u, x, numpy.asarray(L)
-			#yield self.live_pointsu[indices[:,i],:], self.live_pointsx[indices[:,i],:], self.live_pointsL[indices[:,i],:]
-	
+	def remainder(self, d=None):
+		if d is None:
+			indices = [] 
+			for d in range(self.ndata):
+				i = numpy.argsort(self.live_pointsL[:,d]) #[L[d] for L in self.live_pointsL])
+				#indices[d] = i
+				indices.append(i)
+			for i in range(self.nlive_points):
+				u = [self.live_pointsu[indices[d][i],d] for d in range(self.ndata)]
+				x = [self.live_pointsx[indices[d][i],d] for d in range(self.ndata)]
+				L = [self.live_pointsL[indices[d][i],d] for d in range(self.ndata)]
+				yield u, x, numpy.asarray(L)
+		else:
+			indices = numpy.argsort(self.live_pointsL[:,d])
+			for i in indices:
+				yield self.live_pointsu[i,d], self.live_pointsx[i,d], self.live_pointsL[i,d]
 	def next(self):
 		return self.__next__()
 	def __iter__(self):

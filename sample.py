@@ -14,7 +14,7 @@ def gauss(x, z, A, mu, sig):
 
 nx, ndata = y.shape
 rest_wave = 440
-noise_level = 0.4
+noise_level = 0.01
 params = ['A', 'mu', 'sig']
 nparams = len(params)
 def priortransform(cube):
@@ -90,7 +90,7 @@ superset_constrainer = FriendsConstrainer(radial = True, metric = 'euclidean', j
 	rebuild_every=10, verbose=False)
 focusset_constrainer = FriendsConstrainer(radial = True, metric = 'euclidean', jackknife=True, 
 	rebuild_every=1, verbose=False)
-sampler = MultiNestedSampler(nlive_points = 400, 
+sampler = MultiNestedSampler(nlive_points = int(os.environ.get('NLIVE_POINTS','400')), 
 	priortransform=priortransform, multi_loglikelihood=multi_loglikelihood, 
 	ndim=nparams, ndata=ndata,
 	superset_draw_constrained = superset_constrainer.draw_constrained, 
@@ -100,18 +100,19 @@ sampler = MultiNestedSampler(nlive_points = 400,
 focusset_constrainer.sampler = sampler
 superset_constrainer.sampler = sampler
 print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.2, multi_sampler=sampler, min_samples=500) #, max_samples=1000)
+results = multi_nested_integrator(tolerance=0.2, multi_sampler=sampler, min_samples=1000) #, max_samples=1000)
 
 print 'writing output files ...'
 # store results
 with h5py.File(sys.argv[1] + '.out.hdf5', 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
-	u, x, L, w = zip(*results['weights'])
+	u, x, L, w, mask = zip(*results['weights'])
 	f.create_dataset('u', data=u, compression='gzip', shuffle=True)
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('L', data=L, compression='gzip', shuffle=True)
 	f.create_dataset('w', data=w, compression='gzip', shuffle=True)
+	f.create_dataset('mask', data=mask, compression='gzip', shuffle=True)
 	f.create_dataset('ndraws', data=sampler.ndraws)
 	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
 	print 'ndraws:', sampler.ndraws

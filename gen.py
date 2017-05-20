@@ -14,6 +14,7 @@ def gauss(x, z, A, mu, sig):
 x = numpy.linspace(400, 800, 1000)
 
 N = 1000
+N = int(sys.argv[1])
 numpy.random.seed(1)
 z = numpy.random.beta(2, 30, size=N) * 2
 #z = numpy.zeros(N) + 0.01
