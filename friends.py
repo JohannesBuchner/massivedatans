@@ -3,7 +3,6 @@ import scipy.spatial, scipy.cluster
 import matplotlib.pyplot as plt
 from nested_sampling.clustering import clusterdetect
 from nested_sampling.clustering.neighbors import find_maxdistance, find_rdistance, initial_rdistance_guess, nearest_rdistance_guess
-#from nested_sampling.clustering.neighborsnext import find_rdistance as find_rdistance2
 
 class FriendsConstrainer(object):
 	"""
@@ -38,7 +37,8 @@ class FriendsConstrainer(object):
 	"""
 	def __init__(self, rebuild_every = 50, radial = True, metric = 'euclidean', jackknife = False,
 			force_shrink = False,
-			hinter = None, verbose = False):
+			hinter = None, verbose = False, 
+			keep_phantom_points=False, optimize_phantom_points=False):
 		self.maxima = []
 		self.iter = 0
 		self.region = None
@@ -47,9 +47,15 @@ class FriendsConstrainer(object):
 		self.metric = metric
 		self.file = None
 		self.jackknife = jackknife
-		self.force_shrink = False
+		self.force_shrink = force_shrink
 		self.hinter = hinter
 		self.verbose = verbose
+		if keep_phantom_points:
+			assert self.force_shrink, 'keep_phantom_points needs force_shrink=True'
+		self.keep_phantom_points = keep_phantom_points
+		self.optimize_phantom_points = optimize_phantom_points
+		self.phantom_points = []
+		self.phantom_points_Ls = []
 		self.last_cluster_points = None
 	
 	def cluster(self, u, ndim, keepRadius=False):
@@ -62,18 +68,19 @@ class FriendsConstrainer(object):
 				maxdistance = self.region['maxdistance']
 			else:
 				if self.radial:
-					#distances = scipy.spatial.distance.cdist(u, u, metric=self.metric)
 					if self.jackknife:
 						#maxdistance = initial_rdistance_guess(u, k=1, metric=self.metric)
-						##maxdistance = nearest_rdistance_guess(distances)
 						maxdistance = nearest_rdistance_guess(u, metric=self.metric)
 					else:
-						#maxdistance = find_rdistance2(distances, nbootstraps=50, verbose=self.verbose)
-						maxdistance = find_rdistance(u, nbootstraps=50, metric=self.metric, verbose=self.verbose)
+						maxdistance = find_rdistance(u, nbootstraps=20, metric=self.metric, verbose=self.verbose)
 				else:
 					maxdistance = find_maxdistance(u)
 			if self.force_shrink and self.region is not None and 'maxdistance' in self.region:
 				maxdistance = min(maxdistance, self.region['maxdistance'])
+			if self.keep_phantom_points and len(self.phantom_points) > 0:
+				# add phantoms to u now
+				print 'including phantom points in cluster members', self.phantom_points
+				u = numpy.vstack((u, self.phantom_points))
 			ulow  = numpy.max([u.min(axis=0) - maxdistance, numpy.zeros(ndim)], axis=0)
 			uhigh = numpy.min([u.max(axis=0) + maxdistance, numpy.ones(ndim)], axis=0)
 		else:
@@ -145,6 +152,7 @@ class FriendsConstrainer(object):
 		# is it true for at least one?
 		closeby = dist_criterion.any(axis=0)
 		return closeby
+	
 	def generate(self, ndim):
 		it = True
 		verbose = False and self.verbose
@@ -170,7 +178,7 @@ class FriendsConstrainer(object):
 				# do a prefiltering rejection sampling first
 				us = numpy.random.uniform(self.region['ulow'], self.region['uhigh'], size=(100, ndim))
 				ntotal += 100
-				mask = self.are_inside_cluster(us, ndim)
+				mask = self.are_inside_cluster(self.transform_points(us), ndim)
 				if not mask.any():
 					continue
 				us = us[mask]
@@ -222,12 +230,19 @@ class FriendsConstrainer(object):
 					yield u, ntotal
 					ntotal = 0
 			
-	def rebuild(self, previousu, ndim, keepRadius=False):
+	def transform_new_points(self, us):
+		return us
+	def transform_points(self, us):
+		return us
+	def transform_point(self, u):
+		return u
+	
+	def rebuild(self, u, ndim, keepRadius=False):
 		if self.last_cluster_points is None or \
-			len(self.last_cluster_points) != len(previousu) or \
-			numpy.any(self.last_cluster_points != previousu):
-			self.cluster(u=previousu, ndim=ndim, keepRadius=keepRadius)
-			self.last_cluster_points = previousu
+			len(self.last_cluster_points) != len(u) or \
+			numpy.any(self.last_cluster_points != u):
+			self.cluster(u=self.transform_new_points(u), ndim=ndim, keepRadius=keepRadius)
+			self.last_cluster_points = u
 		
 			# reset generator
 			self.generator = self.generate(ndim=ndim)
@@ -264,10 +279,10 @@ class FriendsConstrainer(object):
 	
 	def draw_constrained(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, max_draws=None, **kwargs):
 		# previous is [[u, x, L], ...]
-		rebuild = self.iter % self.rebuild_every == 0
 		self.iter += 1
+		rebuild = self.iter % self.rebuild_every == 1
 		if rebuild or self.region is None:
-			self.rebuild(live_pointsu, ndim, keepRadius=False)
+			self.rebuild(numpy.asarray(live_pointsu), ndim, keepRadius=False)
 		if self.generator is None:
 			self.generator = self.generate(ndim=ndim)
 		ntoaccept = 0
@@ -291,7 +306,7 @@ class FriendsConstrainer(object):
 				
 					for i, lo, hi in hints:
 						u[i] = numpy.random.uniform(lo, hi)
-					if not is_inside(u):
+					if not is_inside(self.transform_point(u)):
 						# not sure if this is a good idea
 						# it means we dont completely trust
 						# the hinting function
@@ -315,7 +330,7 @@ class FriendsConstrainer(object):
 					#self.debugplot(u)
 					break
 			rebuild = True
-			self.rebuild(live_pointsu, ndim, keepRadius=False)
+			self.rebuild(numpy.asarray(live_pointsu), ndim, keepRadius=False)
 
 if __name__ == '__main__':
 	friends = FriendsConstrainer(radial = True)

@@ -10,21 +10,53 @@ import progressbar
 from adaptive_progress import AdaptiveETA
 from numpy import logaddexp
 
-def integrate_remainder(sampler, logwidth, logVolremaining, logZ):
+def integrate_remainder(sampler, logwidth, logVolremaining, logZ, H, globalLmax):
 	# logwidth remains the same now for each sample
 	remainder = list(sampler.remainder())
 	logV = logwidth
 	L0 = remainder[-1][2]
+	logLs = [Li - L0 for ui, xi, Li in remainder]
 	Ls = numpy.exp([Li - L0 for ui, xi, Li in remainder])
-	Lmax = Ls[1:].sum(axis=0) + Ls[-1]
+	LsMax = Ls.copy()
+	LsMax[-1] = numpy.exp(globalLmax - L0)
+	Lmax = LsMax[1:].sum(axis=0) + LsMax[-1]
+	#Lmax = Ls[1:].sum(axis=0) + Ls[-1]
 	Lmin = Ls[:-1].sum(axis=0) + Ls[0]
 	logLmid = log(Ls.sum(axis=0)) + L0
 	logZmid = logaddexp(logZ, logV + logLmid)
 	logZup  = logaddexp(logZ, logV + log(Lmax) + L0)
 	logZlo  = logaddexp(logZ, logV + log(Lmin) + L0)
 	#print 'upper:', logZup, 'lower:', logZlo, 'middle:', logZmid
-	logZerr = numpy.max([logZup - logZmid, logZmid - logZlo], axis=0)
-	return logV + logLmid, logZerr
+	logZerr = logZup - logZlo
+	#logZerr = numpy.max([logZup - logZmid, logZmid - logZlo], axis=0)
+	#return logV + logLmid, logZerr
+
+	# try bootstrapping for error estimation
+	"""
+	bs_logZmids = []
+	for _ in range(20):
+		i = numpy.random.randint(0, len(Ls), len(Ls))
+		i.sort()
+		i = numpy.arange(len(Ls))
+		bs_Ls = LsMax[i,:]
+		Lmax = bs_Ls[1:].sum(axis=0) + bs_Ls[-1]
+		bs_Ls = Ls[i,:]
+		Lmin = bs_Ls[:-1].sum(axis=0) + bs_Ls[0]
+		bs_logZmids.append(logaddexp(logZ, logV + log(Lmax.sum(axis=0)) + L0))
+		bs_logZmids.append(logaddexp(logZ, logV + log(Lmin.sum(axis=0)) + L0))
+	bs_logZerr = numpy.max(bs_logZmids, axis=0) - numpy.min(bs_logZmids, axis=0)
+	#print numpy.shape(bs_logZmids), bs_logZerr.shape, len(Ls), Ls.shape
+	#print 'logZ errors: %.2f %.2f %.2f' % (bs_logZerr[0], logZerr[0], (H[0] / sampler.nlive_points)**0.5)
+	"""
+	for i in range(len(remainder)):
+		ui, xi, Li = remainder[i]
+		wi = logwidth + Li
+		logZnew = logaddexp(logZ, wi)
+		H = exp(wi - logZnew) * Li + exp(logZ - logZnew) * (H + logZ) - logZnew
+		logZ = logZnew
+	
+	return logV + logLmid, logZerr, logZmid, logZerr + (H / sampler.nlive_points)**0.5, logZerr + (H / sampler.nlive_points)**0.5 #, bs_logZerr + (H / sampler.nlive_points)**0.5
+
 
 """
 Performs the Nested Sampling integration by calling the *sampler* multiple times
@@ -45,7 +77,7 @@ is exceeded.
   information: information H
   niterations: number of nested sampling iterations
 """
-def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, min_samples = 0):
+def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, min_samples = 0, need_robust_remainder_error=True):
 	sampler = multi_sampler
 	logVolremaining = 0
 	logwidth = log(1 - exp(-1. / sampler.nlive_points))
@@ -103,20 +135,20 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		pbar.maxval = i_final.max()
 		#logmaxContribution = logZup - logZ
 		
-		if i > max(min_samples, sampler.nlive_points): # and all(remainderZ - log(100) < logZ):
+		if i > min_samples and i % 10 == 1: # and all(remainderZ - log(100) < logZ):
 		#if i > min_samples:
-			remainderZ, remainderZerr = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running])
+			remainderZ, remainderZerr, totalZ, totalZerr, totalZerr_bootstrapped = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running], H[running], sampler.Lmax)
 			# tolerance
 			#remainderZerr[remainderZerr == 0] = 100
 			last_remainderZ[running] = remainderZ
 			last_remainderZerr[running] = remainderZerr
-			total_error = logZerr[running] + remainderZerr
-			terminating = numpy.logical_or(total_error < tolerance, remainderZerr < logZerr[running] / 10.)
+			#total_error = logZerr[running] + remainderZerr
+			terminating = numpy.logical_and(totalZerr < tolerance, remainderZerr < 0.01)
 			#terminating = numpy.random.uniform(size=running.sum()) < 0.1
-			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f ' % (
-				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0])
+			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
+				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
 			if terminating.any():
-				print 'terminating some:', total_error < tolerance, remainderZerr < logZerr[running] / 10.
+				print 'terminating some:', terminating
 				for j, k in enumerate(numpy.where(running)[0]):
 					if terminating[j]:
 						remainder_tails[k] = [[ui, xi, Li, logwidth] for ui, xi, Li in sampler.remainder(j)]
@@ -125,9 +157,9 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 			if not running.any():
 				break
 			#print logZ[running][0], remainderZ[0], logZerr[running], remainderZerr, Li, logaddexp(logZ[running][0], remainderZ[0])
-		else:
-			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f|L=%.2f ' % (
-				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logZ[running][0], max(logZerr[running]), Li[0])
+		#else:
+		#	widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f|L=%.2f^%.2f ' % (
+		#		i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logZ[running][0], max(logZerr[running]), Li[0], sampler.Lmax)
 		print widgets[0]
 		ui, xi, Li = sampler.next()
 		wi = logwidth + Li
@@ -137,7 +169,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 	
 	# not needed for integral, but for posterior samples, otherwise there
 	# is a hole in the most likely parameter ranges.
-	#remainderZ, remainderZerr = integrate_remainder(sampler, last_logwidth, last_logVolremaining, logZ, ~running)
+	#remainderZ, remainderZerr = integrate_remainder(sampler, last_logwidth, last_logVolremaining, logZ)
 	
 	#weights += [[ui, xi, Li, last_logwidth, running] for ui, xi, Li in sampler.remainder()]
 	all_tails = numpy.ones(ndata, dtype=bool)

@@ -2,6 +2,7 @@ import numpy
 from numpy import exp
 import h5py
 import sys
+import json
 import os
 
 print 'loading data...'
@@ -19,10 +20,18 @@ params = ['A', 'mu', 'sig']
 nparams = len(params)
 def priortransform(cube):
 	cube = cube.copy()
+	#cube[0] = 10**(cube[0] * 10 - 5)
 	cube[0] = cube[0] * 10
-	cube[1] = cube[1] * 400 + 400
+	cube[1] = cube[1] * 50 + 400
 	cube[2] = cube[2] * 5
 	return cube
+
+#def priortransform(cube):
+#	cube = cube.copy()
+#	cube[0] = 10**(cube[0] * 10 - 5)
+#	cube[1] = cube[1] * 400 + 400
+#	cube[2] = cube[0] * 10 - 5
+#	return cube
 
 def model(params):
 	A, mu, log_sig_kms = params
@@ -83,14 +92,14 @@ def multi_loglikelihood(params, data_mask):
 from multi_nested_integrator import multi_nested_integrator
 from multi_nested_sampler import MultiNestedSampler
 from friends import FriendsConstrainer
+from hiermetriclearn import MetricLearningFriendsConstrainer
 
 numpy.random.seed(1)
 print 'setting up integrator ...'
-superset_constrainer = FriendsConstrainer(radial = True, metric = 'euclidean', jackknife=True, 
-	rebuild_every=10, verbose=False)
-focusset_constrainer = FriendsConstrainer(radial = True, metric = 'euclidean', jackknife=True, 
-	rebuild_every=1, verbose=False)
-sampler = MultiNestedSampler(nlive_points = int(os.environ.get('NLIVE_POINTS','400')), 
+nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
+superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=10, metric_rebuild_every=nlive_points//2, verbose=False, force_shrink=True)
+focusset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=1, metric_rebuild_every=1, verbose=False)
+sampler = MultiNestedSampler(nlive_points = nlive_points, 
 	priortransform=priortransform, multi_loglikelihood=multi_loglikelihood, 
 	ndim=nparams, ndata=ndata,
 	superset_draw_constrained = superset_constrainer.draw_constrained, 
@@ -100,7 +109,7 @@ sampler = MultiNestedSampler(nlive_points = int(os.environ.get('NLIVE_POINTS','4
 focusset_constrainer.sampler = sampler
 superset_constrainer.sampler = sampler
 print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.2, multi_sampler=sampler, min_samples=1000) #, max_samples=1000)
+results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0) #, max_samples=1000)
 
 print 'writing output files ...'
 # store results
@@ -116,5 +125,8 @@ with h5py.File(sys.argv[1] + '.out.hdf5', 'w') as f:
 	f.create_dataset('ndraws', data=sampler.ndraws)
 	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
 	print 'ndraws:', sampler.ndraws
+
+json.dump(dict(ndraws=sampler.ndraws), 
+	open(sys.argv[1] + '.out.stats.json', 'w'))
 
 

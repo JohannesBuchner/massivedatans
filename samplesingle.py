@@ -21,6 +21,12 @@ def priortransform(cube):
 	cube[1] = cube[1] * 400 + 400
 	cube[2] = cube[2] * 5
 	return cube
+def priortransform(cube):
+	cube = cube.copy()
+	cube[0] = 10**(cube[0] * 10 - 5)
+	cube[1] = cube[1] * 400 + 400
+	cube[2] = 10**(cube[0] * 10 - 5)
+	return cube
 
 def model(params):
 	A, mu, log_sig_kms = params
