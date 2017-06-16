@@ -30,8 +30,8 @@ width_broad = width_broad
 width_narrow = width_narrow
 noise_level = 0.01
 #signal_level = numpy.random.exponential(size=N) * 0.4
-#signal_level = numpy.ones(N) * 0.04
-signal_level = numpy.random.uniform(size=N) * 0.5
+signal_level = numpy.ones(N) * 0.04
+#signal_level = numpy.random.uniform(size=N) * 0.5
 #is_type1 = numpy.random.uniform(size=N) < 0.5
 height_broad  = 10**-1 * signal_level
 height_narrow = signal_level
