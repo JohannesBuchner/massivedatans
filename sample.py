@@ -16,14 +16,15 @@ def gauss(x, z, A, mu, sig):
 nx, ndata = y.shape
 rest_wave = 440
 noise_level = 0.01
-params = ['A', 'mu', 'sig']
+params = ['A', 'mu', 'sig'] #, 'noise_level']
 nparams = len(params)
 def priortransform(cube):
 	cube = cube.copy()
-	#cube[0] = 10**(cube[0] * 10 - 5)
-	cube[0] = cube[0] * 10
-	cube[1] = cube[1] * 50 + 400
-	cube[2] = cube[2] * 5
+	cube[0] = 10**(cube[0] * 2 - 2)
+	#cube[0] = cube[0] * 10
+	cube[1] = cube[1] * 400 + 400
+	cube[2] = cube[2] * 2 + 2
+	##cube[3] = 10**(cube[3] * 2 - 4)
 	return cube
 
 #def priortransform(cube):
@@ -63,7 +64,10 @@ def multi_loglikelihood(params, data_mask):
 from ctypes import *
 from numpy.ctypeslib import ndpointer
 
-lib = cdll.LoadLibrary('./clike.so')
+if int(os.environ.get('OMP_NUM_THREADS', '1')) > 1:
+	lib = cdll.LoadLibrary('./clike-parallel.so')
+else:
+	lib = cdll.LoadLibrary('./clike.so')
 lib.like.argtypes = [
 	ndpointer(dtype=numpy.float64, ndim=1, flags='C_CONTIGUOUS'), 
 	ndpointer(dtype=numpy.float64, ndim=2, flags='C_CONTIGUOUS'), 

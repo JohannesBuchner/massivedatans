@@ -9,6 +9,12 @@ from numpy import exp, log, log10, pi
 import progressbar
 import networkx
 
+# this speeds up things because no copy needed
+networkx_connected_component_subgraphs_args = dict(copy=False)
+# but only supported by newer versions
+if networkx.__version__ == '1.8.1':
+	networkx_connected_component_subgraphs_args = dict()
+
 """
 status_symbols = {0:' ', 1:u"\u2581", 2:u"\u2582", 
 	3:u"\u2583", 4:u"\u2583", 
@@ -274,7 +280,8 @@ class MultiNestedSampler(object):
 			return
 		
 		subgraphs = list(networkx.connected_component_subgraphs(
-			self.membership_graph, copy=False))
+			self.membership_graph, 
+			**networkx_connected_component_subgraphs_args))
 		if len(subgraphs) == 1:
 			yield data_mask, allp
 			return

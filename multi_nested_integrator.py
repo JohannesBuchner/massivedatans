@@ -22,6 +22,9 @@ def integrate_remainder(sampler, logwidth, logVolremaining, logZ, H, globalLmax)
 	Lmax = LsMax[1:].sum(axis=0) + LsMax[-1]
 	#Lmax = Ls[1:].sum(axis=0) + Ls[-1]
 	Lmin = Ls[:-1].sum(axis=0) + Ls[0]
+	# take extreme values for all Lmax, Lmin:
+	Lmax = numpy.exp(globalLmax - L0) * len(Ls)
+	Lmin = numpy.min(Ls) * len(Ls)
 	logLmid = log(Ls.sum(axis=0)) + L0
 	logZmid = logaddexp(logZ, logV + logLmid)
 	logZup  = logaddexp(logZ, logV + log(Lmax) + L0)
@@ -143,7 +146,8 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 			last_remainderZ[running] = remainderZ
 			last_remainderZerr[running] = remainderZerr
 			#total_error = logZerr[running] + remainderZerr
-			terminating = numpy.logical_and(totalZerr < tolerance, remainderZerr < 0.01)
+			#terminating = numpy.logical_and(totalZerr < tolerance, remainderZerr < 0.01)
+			terminating = totalZerr < tolerance
 			#terminating = numpy.random.uniform(size=running.sum()) < 0.1
 			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
 				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
