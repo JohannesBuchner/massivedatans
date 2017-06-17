@@ -35,8 +35,15 @@ for filename in sys.argv[1:]:
 		print 'A', A.mean(), A.std()
 		print 'mu', mu.mean(), mu.std()
 		print 'logsigma', logsigma.mean(), logsigma.std()
-		#plt.plot(A, mu, 'x ')
-		#plt.show()
+		plt.subplot(2, 1, 1)
+		plt.plot(A, mu, 'x ')
+		plt.xlabel('A')
+		plt.ylabel('mu')
+		plt.subplot(2, 1, 2)
+		plt.plot(logsigma, mu, 'x ')
+		plt.xlabel('logsigma')
+		plt.ylabel('mu')
+		plt.show()
 		print f['w'].shape, f['x'].shape
 
 
