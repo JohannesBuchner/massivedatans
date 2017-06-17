@@ -17,12 +17,14 @@ x = numpy.linspace(400, 800, 1000)
 N = 40
 N = int(sys.argv[1])
 numpy.random.seed(1)
-z = numpy.zeros(N) + 0.01
+alpha, beta, scale = 2., 7., 1
+z = numpy.random.beta(alpha, beta, size=N) * scale
+#z = numpy.zeros(N) + 0.01
 rest_wave = 440
 print 'generating parameters ...'
 # in km/s
-width_broad = 10**3 * rest_wave / 300000 * numpy.ones(N)
-width_narrow = 10**1 * rest_wave / 300000 * numpy.ones(N)
+width_broad = 4000 * rest_wave / 300000 * numpy.ones(N)
+width_narrow = 400 * rest_wave / 300000 * numpy.ones(N)
 # convert to nm
 mean_broad  = rest_wave * numpy.ones(N)
 mean_narrow = rest_wave * numpy.ones(N)
@@ -30,7 +32,9 @@ width_broad = width_broad
 width_narrow = width_narrow
 noise_level = 0.01
 #signal_level = numpy.random.exponential(size=N) * 0.4
-signal_level = numpy.ones(N) * 0.04
+#signal_level = numpy.ones(N) * 0.04
+signal_level = numpy.random.normal(0.5, 0.5, size=10*N)
+signal_level = signal_level[signal_level>0.2][:N]
 #signal_level = numpy.random.uniform(size=N) * 0.5
 #is_type1 = numpy.random.uniform(size=N) < 0.5
 height_broad  = 10**-1 * signal_level
