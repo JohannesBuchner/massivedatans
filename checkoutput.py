@@ -19,30 +19,38 @@ for filename in sys.argv[1:]:
 		else:
 			#print f['x'][-1]
 			pass
-		ndraws = f['ndraws']
+		ndraws = f['ndraws'].value
 		print 'logZ = %.1f +- %.1f' % (logZ, logZerr)
 		print 'ndraws:', ndraws
 		#plt.plot(L)
-		w = f['w'][:,0]
-		w = exp(w - w.max())
-		w.sort()
-		w /= w.sum()
-		i = numpy.random.choice(numpy.arange(len(w)), size=1000, replace=True, p=w)
-		A, mu, logsigma = f['x'][:,0,:].transpose()
-		A = log10(A[i])
-		mu = mu[i]
-		logsigma = logsigma[i]
-		print 'A', A.mean(), A.std()
-		print 'mu', mu.mean(), mu.std()
-		print 'logsigma', logsigma.mean(), logsigma.std()
-		plt.subplot(2, 1, 1)
-		plt.plot(A, mu, 'x ')
-		plt.xlabel('A')
-		plt.ylabel('mu')
-		plt.subplot(2, 1, 2)
-		plt.plot(logsigma, mu, 'x ')
-		plt.xlabel('logsigma')
-		plt.ylabel('mu')
+		ndata = f['w'].shape[1]
+		for d in range(ndata):
+			w = f['w'][:,d]
+			w = exp(w - w.max())
+			w.sort()
+			w /= w.sum()
+			i = numpy.random.choice(numpy.arange(len(w)), size=1000, replace=True, p=w)
+			A, mu, logsigma = f['x'][:,d,:].transpose()
+			print numpy.isfinite(A).all(), A[~numpy.isfinite(A)]
+			A = log10(A[i])
+			#A = A[i]
+			mu = mu[i]
+			logsigma = logsigma[i]
+			print 'A', A.mean(), A.std()
+			print 'mu', mu.mean(), mu.std()
+			print 'logsigma', logsigma.mean(), logsigma.std()
+			plt.subplot(3, 1, 1)
+			plt.plot(A, mu, 'x ')
+			plt.xlabel('A')
+			plt.ylabel('mu')
+			plt.subplot(3, 1, 2)
+			plt.plot(logsigma, mu, 'x ')
+			plt.xlabel('logsigma')
+			plt.ylabel('mu')
+			plt.subplot(3, 1, 3)
+			L = f['L'][:,d]
+			L = L[numpy.isfinite(L)]
+			plt.plot(L, '-')
 		plt.show()
 		print f['w'].shape, f['x'].shape
 
