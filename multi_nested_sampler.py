@@ -7,7 +7,7 @@ Modular, Pythonic Implementation of Nested Sampling
 import numpy
 from numpy import exp, log, log10, pi
 import progressbar
-import networkx
+import igraph
 
 """
 status_symbols = {0:' ', 1:u"\u2581", 2:u"\u2582", 
@@ -58,9 +58,7 @@ class MultiNestedSampler(object):
 		#self.samples = []
 		self.ndim = ndim
 		self.ndata = ndata
-		self.use_graph = ndim * ndata < 400 * 400
-		if self.use_graph:
-			self.membership_graph = networkx.Graph()
+		self.membership_graph = igraph.Graph()
 		# draw N starting points from prior
 		pointpile = []
 		pointpilex = []
@@ -68,16 +66,20 @@ class MultiNestedSampler(object):
 		#live_pointsu = [None] * nlive_points
 		#live_pointsx = [None] * nlive_points
 		live_pointsL = [None] * nlive_points
+		for i in range(ndata):
+			self.membership_graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
+		
 		print 'generating initial %d live points' % (nlive_points)
 		data_mask = numpy.ones(ndata) == 1
+
 		for i in range(nlive_points):
 			u = self.draw_global_uniform()
 			x = priortransform(u)
 			L = multi_loglikelihood(x, data_mask=data_mask)
-			live_pointsp[i] = [len(pointpile)]*ndata
-			if self.use_graph:
-				self.membership_graph.add_edges_from((
-					((0, d), (1, len(pointpile))) for d in range(ndata)))
+			p = len(pointpile)
+			live_pointsp[i] = [p]*ndata
+			self.membership_graph.add_vertex("p%d" % p, pointid=p, vtype=1)
+			self.membership_graph.add_edges([("n%d" % d, "p%d" % p) for d in range(ndata)])
 			pointpile.append(u)
 			pointpilex.append(x)
 			#live_pointsu[i] = [u]*ndata
@@ -168,13 +170,12 @@ class MultiNestedSampler(object):
 			
 		self.multi_loglikelihood = multi_loglikelihood_subset
 		
+		"""
 		#print 'cutting graph (not grass)'
 		#print 'surviving:', surviving
 		#print 'surviving IDs:', numpy.where(surviving)[0]
 		#print 'dying IDs:', numpy.where(~surviving)[0]
-		if not self.use_graph:
-			return
-		delete_nodes = [(0,d) for d, survives in enumerate(surviving) if not survives]
+		delete_nodes = ['n%d' % d for d, survives in enumerate(surviving) if not survives]
 		#print 'deleting:', delete_nodes
 		unconnected = [n for n, degree in 
 			self.membership_graph.degree_iter() if degree==0]
@@ -188,39 +189,17 @@ class MultiNestedSampler(object):
 		#for k, v in rename_nodes:
 		#	networkx.relabel_nodes(self.membership_graph, {k:v}, copy=False)
 		#print self.membership_graph.nodes()
-		
-		# or, rebuild graph:
 		"""
-		graph = networkx.Graph()
+		# or, just rebuild graph
+		# because igraph does not support renaming nodes
+		graph = igraph.Graph()
 		# pointing from live_point to member
+		for p in range(len(self.pointpile)):
+			graph.add_vertex("p%d" % p, pointid=p, vtype=1)
 		for i in numpy.where(self.data_mask_all)[0]:
-			graph.add_edges_from((((0, i), (1, p)) for p in self.live_pointsp[:,i]))
-		assert len(self.membership_graph.nodes()) == len(graph.nodes()), (len(self.membership_graph.nodes()), len(graph))
-		assert len(self.membership_graph.edges()) == len(graph.edges()), (len(self.membership_graph.edges()), len(graph))
-		#if not networkx.is_isomorphic(self.membership_graph, graph):
-		for node in self.membership_graph.nodes():
-			if node not in graph:
-				print 'cut graph is missing node', node
-		for node in graph.nodes():
-			if node not in self.membership_graph:
-				print 'cut graph has extra node', node
-		print 'delta1', networkx.difference(self.membership_graph, graph).edges()
-		print 'delta2', networkx.difference(graph, self.membership_graph).edges()
-		print 'collecting edges 1'
-		edges_a = set(graph.edges())
-		print 'collecting edges 2'
-		edges_b = set(self.membership_graph.edges())
-		print 'comparing edges'
-		for (a, b) in edges_a:
-			if (a, b) not in edges_b and (b, a) not in edges_b:
-				print 'cut graph is missing edge', (a, b)
-		for (a, b) in edges_b:
-			if (a, b) not in edges_a and (b, a) not in edges_a:
-				print 'cut graph has extra edge', (a, b)
-		print 'checking if isomorphic:'
-		assert networkx.is_isomorphic(self.membership_graph, graph)
+			graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
+			graph.add_edges([("n%d" % i, "p%d" % p) for p in self.live_pointsp[:,i]])
 		self.membership_graph = graph
-		"""
 		
 	def generate_subsets_nograph(self, data_mask):
 		#if self.dump_iter % 50 == 0:
@@ -266,7 +245,7 @@ class MultiNestedSampler(object):
 			#print 'returning:', member_data_mask, member_live_pointsp
 			yield member_data_mask, member_live_pointsp
 
-	def generate_subsets_graph(self, data_mask):
+	def generate_subsets(self, data_mask):
 		# generate data subsets which share points.
 		live_pointsp = self.live_pointsp
 		
@@ -277,8 +256,7 @@ class MultiNestedSampler(object):
 			yield data_mask, live_pointsp[:,firstmember]
 			return
 		
-		subgraphs = list(networkx.connected_component_subgraphs(
-			self.membership_graph, copy=False))
+		subgraphs = self.membership_graph.clusters()
 		if len(subgraphs) == 1:
 			yield data_mask, allp
 			return
@@ -287,14 +265,19 @@ class MultiNestedSampler(object):
 		for subgraph in subgraphs:
 			member_data_mask = numpy.zeros(len(data_mask), dtype=bool)
 			member_live_pointsp = []
-			for nodetype, i in subgraph:
-				if nodetype == 0:
+			for vi in subgraph:
+				att = self.membership_graph.vs[vi].attributes()
+				#print '    ', att
+				if att['vtype'] == 0:
+					i = att['nodeid']
 					member_data_mask[i] = True
 				else:
-					member_live_pointsp.append(i)
-			if not member_data_mask.any():
-				continue
-			yield member_data_mask, member_live_pointsp
+					p = att['pointid']
+					member_live_pointsp.append(p)
+			if member_data_mask.any():
+				yield member_data_mask, member_live_pointsp
+
+
 	
 	def __next__(self):
 		live_pointsp = self.live_pointsp
@@ -345,10 +328,7 @@ class MultiNestedSampler(object):
 			# it does not make sense to analyse them jointly
 			# so we break them up into membersets here, stringing
 			# together those that do.
-			if self.use_graph:
-				membersets = list(self.generate_subsets_graph(data_mask))
-			else:
-				membersets = list(self.generate_subsets_nograph(data_mask))
+			membersets = list(self.generate_subsets(data_mask))
 			if len(membersets) > 1:
 				# if the data is split, regions need to be 
 				# rebuilt for every group
@@ -396,6 +376,7 @@ class MultiNestedSampler(object):
 				# we have a new draw
 				self.ndraws += int(n)
 				ppi = len(self.pointpile)
+				self.membership_graph.add_vertex("p%d" % ppi, pointid=ppi, vtype=1)
 				self.pointpile = numpy.vstack((self.pointpile, [uj]))
 				self.pointpilex = numpy.vstack((self.pointpilex, [xj]))
 				nfilled = 0
@@ -436,16 +417,14 @@ class MultiNestedSampler(object):
 			#xis.append(self.priortransform(self.pointpile[pj_old]))
 			xis.append(self.pointpilex[pj_old])
 			Lis.append(live_pointsL[i,d])
-			if self.use_graph:
-				self.membership_graph.remove_edge((0,d), (1, pj_old))
+			self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj_old)])
 			pj, uj, xj, Lj = self.shelves[d].pop(0)
 			#ujs.append(uj)
 			#xjs.append(xj)
 			#Ljs.append(Lj)
 			assert Lj > Lmin, (Lj, Lmin)
 			self.live_pointsp[i,d] = pj
-			if self.use_graph:
-				self.membership_graph.add_edge((0,d), (1, pj))
+			self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
 			#live_pointsu[i,d] = uj
 			#live_pointsx[i,d] = xj
 			live_pointsL[i,d] = Lj
