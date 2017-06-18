@@ -53,6 +53,7 @@ class MetricLearningFriendsConstrainer(object):
 		self.clusters = None
 		self.direct_draws_efficient = True
 		self.last_cluster_points = None
+		#self.metricregionhistory = []
 	
 	def cluster(self, u, ndim, keepMetric=False):
 		"""
@@ -196,16 +197,31 @@ class MetricLearningFriendsConstrainer(object):
 					#if all([0 <= ui <= 1 for ui in u]):
 					#	yield u, ntotal
 					#	ntotal = 0
-		
+	
 	def rebuild(self, u, ndim, keepMetric=False):
-		if self.last_cluster_points is None or \
-			len(self.last_cluster_points) != len(u) or \
-			numpy.any(self.last_cluster_points != u):
-			self.cluster(u=u, ndim=ndim, keepMetric=keepMetric)
-			self.last_cluster_points = u
-			
-			print 'maxdistance:', self.region.maxdistance
-			self.generator = self.generate(ndim)
+		if self.last_cluster_points is not None and \
+			len(self.last_cluster_points) == len(u) and \
+			numpy.all(self.last_cluster_points == u):
+			# nothing
+			return
+		
+		#for prev_u, prev_region, prev_metric, prev_clusters in self.metricregionhistory[::-1]:
+		#	if prev_u.shape == u.shape and numpy.all(prev_u == u):
+		#		self.region = prev_region
+		#		self.metric = prev_metric
+		#		self.clusters = prev_clusters
+		#		self.generator = self.generate(ndim)
+		#		return
+		
+		self.cluster(u=u, ndim=ndim, keepMetric=keepMetric)
+		self.last_cluster_points = u
+		#if keepMetric is False:
+		#	# store into history only fresh ones with new metric
+		#	self.metricregionhistory.append((u, self.region, self.metric, self.clusters))
+		#	self.metricregionhistory = self.metricregionhistory[-10:]
+		
+		print 'maxdistance:', self.region.maxdistance
+		self.generator = self.generate(ndim)
 	
 	def is_last_of_its_cluster(self, u, uothers):
 		# check if only point of current clustering left
@@ -316,18 +332,18 @@ class MetricLearningFriendsConstrainer(object):
 				
 				if numpy.any(L > Lmins):
 					# yay, we win
-					print 'accept after %d tries' % ntoaccept
+					#print 'accept after %d tries' % ntoaccept
 					return u, x, L, ntoaccept
 				
 				# if running very inefficient, optimize clustering 
 				#     if we haven't done so at the start
-				if not rebuild and ntoaccept > 1000:
+				if not rebuild and ntoaccept > 100:
 					rebuild = True
 					print 'low efficiency is triggering RadFriends rebuild'
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=True)
 					break
-				#if not rebuild_metric and ntoaccept > 1000:
-				#	rebuild_metric = True
-				#	print 'low efficiency is triggering metric rebuild'
-				#	self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=False)
-				#	break
+				if not rebuild_metric and ntoaccept > 1000:
+					rebuild_metric = True
+					print 'low efficiency is triggering metric rebuild'
+					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=False)
+					break
