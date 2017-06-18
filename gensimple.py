@@ -12,11 +12,11 @@ def gauss(x, z, A, mu, sig):
 	sigT = sig.reshape((-1,1))
 	return AT * exp(-0.5 * ((muT - xT / (1. + zT))/sigT)**2)
 
-x = numpy.linspace(400, 800, 1000)
+x = numpy.linspace(400, 800, 200)
 
 N = 40
 N = int(sys.argv[1])
-numpy.random.seed(1)
+numpy.random.seed(N)
 alpha, beta, scale = 2., 7., 1
 z = numpy.random.beta(alpha, beta, size=N) * scale
 #z = numpy.zeros(N) + 0.01
