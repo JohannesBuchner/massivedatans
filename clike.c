@@ -35,8 +35,22 @@ int like(
 	adouble * Lout = (adouble*) Loutp;
 	
 	#ifdef PARALLEL
+	int k = 0;
 	#pragma omp parallel for
-	#endif
+	// this is stupid because it does not actually safe model evaluations,
+	// but at least it should run faster for our testing purposes.
+	for (int i = 0; i < ndata; i++) {
+		if (data_mask[i]) {
+			Lout[k] = 0;
+			for (int j = 0; j < nx; j++) {
+				const double ypred = A * exp(-0.5 * sqr((mu - x[j])/sig));
+				IFVERBOSE printf("y %d %d: %f %f\n", i, j, yy[i + j*ndata], ypred);
+				Lout[k] += sqr((ypred - yy[i + j*ndata]) / noise_level);
+			}
+			k++;
+		}
+	}
+	#else
 	for (int j = 0; j < nx; j++) {
 		const double ypred = A * exp(-0.5 * sqr((mu - x[j])/sig));
 		
@@ -50,6 +64,7 @@ int like(
 			}
 		}
 	}
+	#endif	
 	IFVERBOSE {
 		int k = 0;
 		for (int i = 0; i < ndata; i++) {

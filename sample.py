@@ -64,7 +64,7 @@ def multi_loglikelihood(params, data_mask):
 from ctypes import *
 from numpy.ctypeslib import ndpointer
 
-if int(os.environ.get('OMP_NUM_THREADS', '1')) > 1:
+if int(os.environ.get('OMP_NUM_THREADS', '1')) > 1 and False: # does not work correctly yet
 	lib = cdll.LoadLibrary('./clike-parallel.so')
 else:
 	lib = cdll.LoadLibrary('./clike.so')
@@ -87,6 +87,7 @@ def multi_loglikelihood(params, data_mask):
 	Lout = numpy.zeros(data_mask.sum())
 	ret = lib.like(x, y, ndata, nx, A, mu, sig, noise_level, data_mask, Lout)
 	#assert ret == 0, (ret, -0.5*Lout)
+	assert numpy.isfinite(Lout).all(), (Lout, params)
 	return -0.5 * Lout
 
 #print multi_loglikelihood([0.88091237,  444.44207558,    2.77671952], numpy.ones(ndata)==1)
@@ -101,7 +102,7 @@ from hiermetriclearn import MetricLearningFriendsConstrainer
 numpy.random.seed(1)
 print 'setting up integrator ...'
 nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
-superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=10, metric_rebuild_every=nlive_points//2, verbose=False, force_shrink=True)
+superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=10, metric_rebuild_every=10, verbose=False, force_shrink=True)
 focusset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=1, metric_rebuild_every=1, verbose=False)
 sampler = MultiNestedSampler(nlive_points = nlive_points, 
 	priortransform=priortransform, multi_loglikelihood=multi_loglikelihood, 
