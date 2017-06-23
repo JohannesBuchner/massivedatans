@@ -9,14 +9,16 @@ from numpy import exp, log, log10, pi
 import progressbar
 from adaptive_progress import AdaptiveETA
 from numpy import logaddexp
+import sys
 
 def integrate_remainder(sampler, logwidth, logVolremaining, logZ, H, globalLmax):
 	# logwidth remains the same now for each sample
 	remainder = list(sampler.remainder())
 	logV = logwidth
 	L0 = remainder[-1][2]
+	L0 = globalLmax
 	logLs = [Li - L0 for ui, xi, Li in remainder]
-	Ls = numpy.exp([Li - L0 for ui, xi, Li in remainder])
+	Ls = numpy.exp(logLs)
 	LsMax = Ls.copy()
 	LsMax[-1] = numpy.exp(globalLmax - L0)
 	Lmax = LsMax[1:].sum(axis=0) + LsMax[-1]
@@ -130,6 +132,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		#midContribution = logaddexp(maxContribution, minContribution)
 		#logZup  = logaddexp(maxContribution, logZ)
 		#logZmid = logaddexp(midContribution, logZ)
+		sys.stdout.flush()
 		pbar.update(i)
 		
 		# expected number of iterations:
@@ -152,7 +155,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
 				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
 			if terminating.any():
-				print 'terminating some:', terminating
+				print 'terminating %d, namely:' % terminating.sum(), list(numpy.where(terminating)[0])
 				for j, k in enumerate(numpy.where(running)[0]):
 					if terminating[j]:
 						remainder_tails[k] = [[ui, xi, Li, logwidth] for ui, xi, Li in sampler.remainder(j)]

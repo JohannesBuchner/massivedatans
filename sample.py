@@ -4,6 +4,7 @@ import h5py
 import sys
 import json
 import os
+import time
 
 print 'loading data...'
 f = h5py.File(sys.argv[1], 'r')
@@ -100,6 +101,7 @@ from friends import FriendsConstrainer
 from hiermetriclearn import MetricLearningFriendsConstrainer
 
 numpy.random.seed(1)
+start_time = time.time()
 print 'setting up integrator ...'
 nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
 superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=10, metric_rebuild_every=10, verbose=False, force_shrink=True)
@@ -115,7 +117,7 @@ focusset_constrainer.sampler = sampler
 superset_constrainer.sampler = sampler
 print 'integrating ...'
 results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0) #, max_samples=1000)
-
+duration = time.time() - start_time
 print 'writing output files ...'
 # store results
 with h5py.File(sys.argv[1] + '.out.hdf5', 'w') as f:
@@ -131,7 +133,9 @@ with h5py.File(sys.argv[1] + '.out.hdf5', 'w') as f:
 	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
 	print 'ndraws:', sampler.ndraws
 
-json.dump(dict(ndraws=sampler.ndraws), 
+print 'writing statistic ...'
+json.dump(dict(ndraws=sampler.ndraws, duration=duration), 
 	open(sys.argv[1] + '.out.stats.json', 'w'))
+print 'done.'
 
 

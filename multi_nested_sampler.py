@@ -58,7 +58,9 @@ class MultiNestedSampler(object):
 		#self.samples = []
 		self.ndim = ndim
 		self.ndata = ndata
-		self.membership_graph = igraph.Graph()
+		self.superpoints = []
+		# lazy building of graph
+		self.membership_graph = None
 		# draw N starting points from prior
 		pointpile = []
 		pointpilex = []
@@ -66,8 +68,6 @@ class MultiNestedSampler(object):
 		#live_pointsu = [None] * nlive_points
 		#live_pointsx = [None] * nlive_points
 		live_pointsL = [None] * nlive_points
-		for i in range(ndata):
-			self.membership_graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
 		
 		print 'generating initial %d live points' % (nlive_points)
 		data_mask = numpy.ones(ndata) == 1
@@ -78,13 +78,12 @@ class MultiNestedSampler(object):
 			L = multi_loglikelihood(x, data_mask=data_mask)
 			p = len(pointpile)
 			live_pointsp[i] = [p]*ndata
-			self.membership_graph.add_vertex("p%d" % p, pointid=p, vtype=1)
-			self.membership_graph.add_edges([("n%d" % d, "p%d" % p) for d in range(ndata)])
 			pointpile.append(u)
 			pointpilex.append(x)
 			#live_pointsu[i] = [u]*ndata
 			#live_pointsx[i] = [x]*ndata
 			live_pointsL[i] = L
+			self.superpoints.append(p)
 			#self.samples.append([live_pointsu[i], live_pointsx[i], live_pointsL[i]])
 		print 'generated %d live points' % (nlive_points)
 		self.pointpile = numpy.array(pointpile)
@@ -113,7 +112,7 @@ class MultiNestedSampler(object):
 	
 	def get_unique_pointsp(self, allpoints):
 		idx = numpy.unique(allpoints)
-		return self.pointpile[idx]
+		return self.pointpile[idx], idx
 	
 	def prepare(self):
 		live_pointsL = self.live_pointsL
@@ -122,41 +121,16 @@ class MultiNestedSampler(object):
 		# clean up shelves
 		for d in range(self.ndata):
 			self.shelves[d] = [(pj, uj, xj, Lj) for (pj, uj, xj, Lj) in self.shelves[d] if Lj > Lmins[d]]
-		
-		#print 'finding unique points...'
-		#d = live_pointsu.reshape((-1,self.ndim))
-		#b = d.view(numpy.dtype((numpy.void, d.dtype.itemsize * d.shape[1])))
-		#_, idx = numpy.unique(b, return_index=True)
-		#all_global_live_pointsu = d[idx]
-		#all_global_live_pointsu = self.get_unique_points(live_pointsu)
-		all_global_live_pointsu = self.get_unique_pointsp(self.live_pointsp)
-		#global_live_pointsu_set = set()
-		#global_live_pointsu = []
-		#global_live_pointsx = []
-		#global_live_pointsL = []
-		#for d in range(self.ndata):
-		#	global_live_pointsu_set.update([tuple(u) for u in live_pointsu[:,d]])
-			#for u, x, L in zip(live_pointsu[:,d], live_pointsx[:,d], live_pointsL[:,d]):
-				#if tuple(u) not in global_live_pointsu_set:
-				#	global_live_pointsu_set.add(tuple(u))
-				#	global_live_pointsu.append(u)
-					#global_live_pointsx.append(x)
-					#global_live_pointsL.append(L)
-		#all_global_live_pointsu = numpy.array([list(u) for u in global_live_pointsu_set])
+		all_global_live_pointsu, all_global_live_pointsp = self.get_unique_pointsp(self.live_pointsp)
 		all_Lmin = live_pointsL.min()
-		#all_global_live_pointsL = numpy.array(global_live_pointsL)
-		#all_global_live_pointsx = numpy.array(global_live_pointsx)
-		return all_global_live_pointsu, all_Lmin, Lmins, Lmini
+		return all_global_live_pointsu, all_global_live_pointsp, all_Lmin, Lmins, Lmini
 	
 	def shelf_status(self):
 		print ('shelf status: %s' % ''.join([status_symbols.get(len(shelf), 'X') for shelf in self.shelves])).encode('utf-8')
 	
 	def cut_down(self, surviving):
 		# delete some data sets
-		
 		self.live_pointsp = self.live_pointsp[:,surviving]
-		#self.live_pointsu = self.live_pointsu[:,surviving]
-		#self.live_pointsx = self.live_pointsx[:,surviving]
 		self.live_pointsL = self.live_pointsL[:,surviving]
 		self.shelves = [shelf for s, shelf in zip(surviving, self.shelves) if s]
 		self.ndata = surviving.sum()
@@ -169,48 +143,42 @@ class MultiNestedSampler(object):
 			return self.real_multi_loglikelihood(params, subset_mask)
 			
 		self.multi_loglikelihood = multi_loglikelihood_subset
+		# rebuild graph because igraph does not support renaming nodes
+		self.membership_graph = None
+	
+	def rebuild_graph(self):
+		if self.membership_graph is None:
+			print 'constructing graph...'
+			graph = igraph.Graph(directed=False)
+			# pointing from live_point to member
+			for p in range(len(self.pointpile)):
+				graph.add_vertex("p%d" % p, pointid=p, vtype=1)
+			edges = []
+			for i in numpy.where(self.data_mask_all)[0]:
+				graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
+				edges += [("n%d" % i, "p%d" % p) for p in self.live_pointsp[:,i]]
+			print 'connecting graph ...'
+			graph.add_edges(edges)
+			print 'constructing graph done.'
+			self.membership_graph = graph
 		
-		"""
-		#print 'cutting graph (not grass)'
-		#print 'surviving:', surviving
-		#print 'surviving IDs:', numpy.where(surviving)[0]
-		#print 'dying IDs:', numpy.where(~surviving)[0]
-		delete_nodes = ['n%d' % d for d, survives in enumerate(surviving) if not survives]
-		#print 'deleting:', delete_nodes
-		unconnected = [n for n, degree in 
-			self.membership_graph.degree_iter() if degree==0]
-		#print 'dropping:', unconnected
-		self.membership_graph.remove_nodes_from(unconnected)
-		# renaming in forward order, so we do not collide
-		rename_nodes = [((0, oldd), (0, newd)) for newd, oldd in enumerate(numpy.where(surviving)[0]) if newd != oldd]
-		#print 'renaming:', rename_nodes
-		self.membership_graph.remove_nodes_from(delete_nodes)
-		networkx.relabel_nodes(self.membership_graph, dict(rename_nodes), copy=False)
-		#for k, v in rename_nodes:
-		#	networkx.relabel_nodes(self.membership_graph, {k:v}, copy=False)
-		#print self.membership_graph.nodes()
-		"""
-		# or, just rebuild graph
-		# because igraph does not support renaming nodes
-		graph = igraph.Graph()
-		# pointing from live_point to member
-		for p in range(len(self.pointpile)):
-			graph.add_vertex("p%d" % p, pointid=p, vtype=1)
-		for i in numpy.where(self.data_mask_all)[0]:
-			graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
-			graph.add_edges([("n%d" % i, "p%d" % p) for p in self.live_pointsp[:,i]])
-		self.membership_graph = graph
-		
-	def generate_subsets_nograph(self, data_mask):
+	def generate_subsets_nograph(self, data_mask, allp):
 		#if self.dump_iter % 50 == 0:
 		#	numpy.savez('dump_%d.npz' % self.dump_iter, 
 		#		live_pointsp=self.live_pointsp, data_mask=data_mask)
 		#self.dump_iter += 1
 		# generate data subsets which share points.
 		firstmember = numpy.where(data_mask)[0][0]
-		if len(self.live_pointsp[:,firstmember]) == len(numpy.unique(self.live_pointsp[:,data_mask].flatten())):
-			# trivial case: all live points are the same across data sets
-			yield data_mask, self.live_pointsp[:,firstmember]
+		#if len(self.live_pointsp[:,firstmember]) == len(numpy.unique(self.live_pointsp[:,data_mask].flatten())):
+		#	# trivial case: all live points are the same across data sets
+		#	yield data_mask, self.live_pointsp[:,firstmember]
+		#	return
+
+		if len(allp) < 2 * self.nlive_points:
+			# if fewer than 2*nlive unique points are known, 
+			# some must be shared between data sets.
+			# So no disjoint data sets
+			yield data_mask, allp
 			return
 		
 		to_handle = data_mask.copy()
@@ -245,28 +213,63 @@ class MultiNestedSampler(object):
 			#print 'returning:', member_data_mask, member_live_pointsp
 			yield member_data_mask, member_live_pointsp
 
-	def generate_subsets(self, data_mask):
+	def generate_subsets(self, data_mask, allp):
 		# generate data subsets which share points.
-		live_pointsp = self.live_pointsp
-		
-		firstmember = numpy.where(data_mask)[0][0]
-		allp = numpy.unique(live_pointsp[:,data_mask].flatten())
-		if len(live_pointsp[:,firstmember]) == len(allp):
-			# trivial case: all live points are the same across data sets
-			yield data_mask, live_pointsp[:,firstmember]
+		selected = numpy.where(data_mask)[0]
+		all_selected = len(selected) == len(data_mask)
+		firstmember = selected[0]
+		if len(selected) == 1:
+			# trivial case:
+			# requested only a single slot, so return its live points
+			yield data_mask, self.live_pointsp[:,firstmember]
 			return
 		
-		subgraphs = self.membership_graph.clusters()
+		if not all_selected:
+			allp = numpy.unique(self.live_pointsp[:,selected].flatten())
+		
+		if len(allp) < 2 * self.nlive_points:
+			print 'generate_subsets: only %d unique live points known, so connected' % len(allp)
+			# if fewer than 2*nlive unique points are known, 
+			# some must be shared between data sets.
+			# So no disjoint data sets
+			yield data_mask, allp
+			return
+		
+		if len(self.superpoints) > 0:
+			print 'generate_subsets: %d superpoints known, so connected' % len(self.superpoints)
+			# there are some points shared by all data sets
+			# so no disjoint data sets
+			yield data_mask, allp
+			return
+		
+		self.rebuild_graph()
+		if all_selected:
+			graph = self.membership_graph
+			members = None
+		else:
+			# need to look at the subgraph with only the selected
+			# dataset nodes
+			#members = self.membership_graph.vs.select(['p%d' % v for v, sel in enumerate(data_mask) if sel])
+			members  = ['n%d' % v for v, sel in enumerate(data_mask) if sel]
+			members += ['p%d' % p for p in allp]
+			graph = self.membership_graph.subgraph(members)
+		subgraphs = graph.clusters()
+		if len(subgraphs) == 0:
+			print 'all_selected', all_selected, ':', selected
+			print graph
+			print 'vertices:', [v.attributes()['name'] for v in graph.vs]
+			print 'members:', members
+			assert False, 'no subgraphs found'
 		if len(subgraphs) == 1:
 			yield data_mask, allp
 			return
-	
+		
 		# then identify disjoint subgraphs
 		for subgraph in subgraphs:
 			member_data_mask = numpy.zeros(len(data_mask), dtype=bool)
 			member_live_pointsp = []
 			for vi in subgraph:
-				att = self.membership_graph.vs[vi].attributes()
+				att = graph.vs[vi].attributes()
 				#print '    ', att
 				if att['vtype'] == 0:
 					i = att['nodeid']
@@ -276,11 +279,13 @@ class MultiNestedSampler(object):
 					member_live_pointsp.append(p)
 			if member_data_mask.any():
 				yield member_data_mask, member_live_pointsp
-
+			#else:
+			#	print 'skipping node-free subgraph:', [self.membership_graph.vs[vi].attributes()['name'] for vi in subgraph]
+			#	print graph
 
 	
 	def __next__(self):
-		live_pointsp = self.live_pointsp
+		#live_pointsp = self.live_pointsp
 		#live_pointsu = self.live_pointsu
 		#live_pointsx = self.live_pointsx
 		live_pointsL = self.live_pointsL
@@ -297,7 +302,7 @@ class MultiNestedSampler(object):
 		# 
 		#print
 		#print 'housekeeping...'
-		all_global_live_pointsu, all_Lmin, Lmins, Lmini = self.prepare()
+		all_global_live_pointsu, all_global_live_pointsp, all_Lmin, Lmins, Lmini = self.prepare()
 		iter = 0
 		while True:
 			iter += 1
@@ -315,11 +320,12 @@ class MultiNestedSampler(object):
 				# cut_level = 5 4 3 2 1 0 0 0 0 
 				#cut_level = max(0, 5 - (iter - self.nsuperset_draws))
 				#data_mask = numpy.array([len(self.shelves[d]) <= cut_level for d in range(self.ndata)])
-				global_live_pointsu = self.get_unique_pointsp(self.live_pointsp[:,data_mask])
+				global_live_pointsu, global_live_pointsp = self.get_unique_pointsp(self.live_pointsp[:,data_mask])
 			else:
 				# super-set draw, try to fill all/any
 				data_mask = self.data_mask_all
 				global_live_pointsu = all_global_live_pointsu
+				global_live_pointsp = all_global_live_pointsp
 				Lmin = all_Lmin
 			use_rebuilding_draw = sample_subset
 			
@@ -328,7 +334,8 @@ class MultiNestedSampler(object):
 			# it does not make sense to analyse them jointly
 			# so we break them up into membersets here, stringing
 			# together those that do.
-			membersets = list(self.generate_subsets(data_mask))
+			membersets = list(self.generate_subsets(data_mask, global_live_pointsp))
+			assert len(membersets) > 0
 			if len(membersets) > 1:
 				# if the data is split, regions need to be 
 				# rebuilt for every group
@@ -356,10 +363,14 @@ class MultiNestedSampler(object):
 				Lmins_higher = Lmins[joint_data_mask].copy()
 				for j, d in enumerate(numpy.where(joint_data_mask)[0]):
 					n = len(self.shelves[d])
+					if n == 0:
+						# relevant only for non-empty shelves
+						continue
 					# to insert at position n
 					# there must be n elements smaller
 					# in self.shelves[d] and self.live_pointsL[:,d]
-					Lentries = sorted(live_pointsL[:,d].tolist() + [Li for _, _, _, Li in self.shelves[d]])
+					Lentries = numpy.hstack((live_pointsL[:,d], [Li for _, _, _, Li in self.shelves[d]]))
+					Lentries.sort()
 					# so Lmin should be Lentries[n], because the nth element has to be beaten
 					Lmins_higher[j] = Lentries[n]
 				
@@ -376,7 +387,8 @@ class MultiNestedSampler(object):
 				# we have a new draw
 				self.ndraws += int(n)
 				ppi = len(self.pointpile)
-				self.membership_graph.add_vertex("p%d" % ppi, pointid=ppi, vtype=1)
+				if self.membership_graph is not None:
+					self.membership_graph.add_vertex("p%d" % ppi, pointid=ppi, vtype=1)
 				self.pointpile = numpy.vstack((self.pointpile, [uj]))
 				self.pointpilex = numpy.vstack((self.pointpilex, [xj]))
 				nfilled = 0
@@ -384,71 +396,83 @@ class MultiNestedSampler(object):
 					if Lj[j] > Lmins_higher[j]:
 						self.shelves[d].append((ppi, uj, xj, Lj[j]))
 						nfilled += 1
-					#elif Lj[j] > Lmins[d]:
-					#	n = len(self.shelves[d])
-					#	# to insert at position n
-					#	# there must be n elements smaller than 
-					#	# Lj[j] in self.shelves[d] and self.live_pointsL[:,d]
-					#	nsmaller = (live_pointsL[:,d] < Lj[j]).sum()
-					#	if nsmaller >= n or nsmaller + sum([Li < Lj[j] for _, _, _, Li in self.shelves[d]]) >= n:
-					#		assert False, (nsmaller, Lj[j], Lmins[d], Lmins_higher[j])
-					#		self.shelves[d].append((ppi, uj, xj, Lj[j]))
-					#	else:
-					#		assert False, (nsmaller, Lj[j], Lmins[d], Lmins_higher[j])
-				print 'accept after %d tries, filled %d shelfes' % (n, nfilled)
+				if nfilled == self.ndata:
+					# new point is a superpoint, accepted by all
+					self.superpoints.append(ppi)
+				print 'accept after %d tries, filled %d shelves' % (n, nfilled)
 			
 			# we got a new point
 			#print 'new point: > %.1f' % Lmins[data_mask].min() #, (Lj>Lmins[data_mask])*1
 		
 		# pop: for every data entry, advance one point
+		print 'advancing all...'
+		pj_old = self.live_pointsp[Lmini,numpy.arange(self.ndata)]
+		uis = self.pointpile[pj_old]
+		xis = self.pointpilex[pj_old]
+		Lis = live_pointsL[Lmini, numpy.arange(self.ndata)]
+		if self.membership_graph is not None:
+			self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj) for d, pj in enumerate(pj_old)])
+		for pj in numpy.unique(pj_old):
+			# no longer a superpoint, because it is no
+			# longer shared by all data sets
+			if pj in self.superpoints:
+				self.superpoints.remove(pj)
+		for d in range(self.ndata):
+			i = Lmini[d]
+			pj, uj, xj, Lj = self.shelves[d].pop(0)
+			self.live_pointsp[i,d] = pj
+			live_pointsL[i,d] = Lj
+			if self.membership_graph is not None:
+				self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
+		"""
 		uis = []
 		xis = []
 		Lis = []
-		#ujs = []
-		#xjs = []
-		#Ljs = []
 		for d in range(self.ndata):
 			Lmin = Lmins[d]
 			i = Lmini[d]
 			pj_old = self.live_pointsp[i,d]
-			#uis.append(live_pointsu[i,d])
 			uis.append(self.pointpile[pj_old])
-			#xis.append(live_pointsx[i,d])
-			#xis.append(self.priortransform(self.pointpile[pj_old]))
 			xis.append(self.pointpilex[pj_old])
 			Lis.append(live_pointsL[i,d])
-			self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj_old)])
+			if self.membership_graph is not None:
+				self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj_old)])
+			# pj_old is no longer a superpoint, because it is no
+			# longer shared by all data sets
+			if pj_old in self.superpoints:
+				self.superpoints.remove(pj_old)
 			pj, uj, xj, Lj = self.shelves[d].pop(0)
-			#ujs.append(uj)
-			#xjs.append(xj)
-			#Ljs.append(Lj)
 			assert Lj > Lmin, (Lj, Lmin)
 			self.live_pointsp[i,d] = pj
-			self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
-			#live_pointsu[i,d] = uj
-			#live_pointsx[i,d] = xj
+			if self.membership_graph is not None:
+				self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
 			live_pointsL[i,d] = Lj
+		"""
 		self.Lmax = live_pointsL.max(axis=0)
 		#print 'Lmax:', self.Lmax
 		assert self.Lmax.shape == (self.ndata,)
-		#self.samples.append([ujs, xjs, Ljs])
+		print 'advancing done.'
 		return numpy.asarray(uis), numpy.asarray(xis), numpy.asarray(Lis)
 	
 	def remainder(self, d=None):
 		if d is None:
-			indices = [] 
+			print 'sorting remainder...'
+			indices = numpy.empty((self.ndata, self.nlive_points), dtype=int)
 			for d in range(self.ndata):
-				i = numpy.argsort(self.live_pointsL[:,d]) #[L[d] for L in self.live_pointsL])
-				#indices[d] = i
-				indices.append(i)
+				indices[d,:] = numpy.argsort(self.live_pointsL[:,d])
+			ds = numpy.arange(self.ndata)
+			print 'building remainder...'
 			for i in range(self.nlive_points):
-				u = [self.pointpile[self.live_pointsp[indices[d][i],d]] for d in range(self.ndata)]
-				x = [self.pointpilex[self.live_pointsp[indices[d][i],d]] for d in range(self.ndata)]
-				#u = [self.live_pointsu[indices[d][i],d] for d in range(self.ndata)]
-				#x = [self.live_pointsx[indices[d][i],d] for d in range(self.ndata)]
-				#x = [self.priortransform(ui) for ui in u]
-				L = [self.live_pointsL[indices[d][i],d] for d in range(self.ndata)]
-				yield u, x, numpy.asarray(L)
+				j = indices[ds,i]
+				p = self.live_pointsp[j,ds]
+				u = self.pointpile[p]
+				x = self.pointpilex[p]
+				L = self.live_pointsL[j,ds]
+				#u = [self.pointpile[self.live_pointsp[indices[d][i],d]] for d in range(self.ndata)]
+				#x = [self.pointpilex[self.live_pointsp[indices[d][i],d]] for d in range(self.ndata)]
+				#L = numpy.asarray([self.live_pointsL[indices[d][i],d] for d in range(self.ndata)])
+				yield u, x, L
+			print 'remainder done.'
 		else:
 			indices = numpy.argsort(self.live_pointsL[:,d])
 			for i in indices:
