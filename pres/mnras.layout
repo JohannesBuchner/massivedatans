@@ -1,0 +1,7 @@
+#% Do not delete the line below; configure depends on this
+# \DeclareLaTeXClass[mnras]{article (mnras)}
+# Input general definitions
+Input stdclass.inc
+Style Abstract
+	InTitle 1
+End
