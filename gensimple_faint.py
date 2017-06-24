@@ -55,9 +55,13 @@ for i in range(N):
 	y[:,i] += numpy.random.normal(0, noise_level, size=len(x))
 
 print 'plotting ...'
-for i in range(min(N, 20)):
+colors = ['yellow', 'pink', 'cyan', 'magenta']
+for i in range(min(N, 4)):
 	#plt.plot(x, y[:,i], '.-')
-	plt.plot(x, y[:,i], '-')
+	plt.plot( rest_wave * (1+z[i]), 0.15 * height_narrow[i] / noise_level, 'v', color=colors[i], ms=12)
+	plt.plot(x, y[:,i] / noise_level, '-', color=colors[i])
+plt.ylabel('Detector signal')
+plt.xlabel('Wavelength [nm]')
 plt.savefig('genfaint.pdf', bbox_inches='tight')
 plt.close()
 
