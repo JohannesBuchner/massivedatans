@@ -8,6 +8,7 @@ import numpy
 from numpy import exp, log, log10, pi
 import progressbar
 import igraph
+from collections import defaultdict
 
 """
 status_symbols = {0:' ', 1:u"\u2581", 2:u"\u2582", 
@@ -47,7 +48,7 @@ class MultiNestedSampler(object):
 	"""
 	def __init__(self, priortransform, multi_loglikelihood, superset_draw_constrained, draw_constrained, 
 			ndata, ndim, nlive_points = 200, draw_global_uniform = None,
-			nsuperset_draws = 10):
+			nsuperset_draws = 10, use_graph=False):
 		self.nlive_points = nlive_points
 		self.nsuperset_draws = nsuperset_draws
 		self.priortransform = priortransform
@@ -60,7 +61,9 @@ class MultiNestedSampler(object):
 		self.ndata = ndata
 		self.superpoints = []
 		# lazy building of graph
+		self.use_graph = use_graph
 		self.membership_graph = None
+		self.point_data_map = None
 		# draw N starting points from prior
 		pointpile = []
 		pointpilex = []
@@ -145,6 +148,13 @@ class MultiNestedSampler(object):
 		self.multi_loglikelihood = multi_loglikelihood_subset
 		# rebuild graph because igraph does not support renaming nodes
 		self.membership_graph = None
+		self.point_data_map = None
+		#if self.point_data_map is not None:
+		#	for d, s in enumerate(surviving)
+		#		if s: continue
+		#		for p in self.live_pointsp[:,d]:
+		#			self.point_data_map[p].add(d)
+			
 	
 	def rebuild_graph(self):
 		if self.membership_graph is None:
@@ -161,26 +171,48 @@ class MultiNestedSampler(object):
 			graph.add_edges(edges)
 			print 'constructing graph done.'
 			self.membership_graph = graph
-		
+	
+	def rebuild_map(self):
+		if self.point_data_map is None:
+			print 'constructing map...'
+			# pointing from live_point to member
+			self.point_data_map = defaultdict(set)
+			for i in range(self.ndata):
+				for p in self.live_pointsp[:,i]:
+					self.point_data_map[p].add(i)
+			print 'constructing map done.'
+	
+	
 	def generate_subsets_nograph(self, data_mask, allp):
-		#if self.dump_iter % 50 == 0:
-		#	numpy.savez('dump_%d.npz' % self.dump_iter, 
-		#		live_pointsp=self.live_pointsp, data_mask=data_mask)
-		#self.dump_iter += 1
 		# generate data subsets which share points.
-		firstmember = numpy.where(data_mask)[0][0]
-		#if len(self.live_pointsp[:,firstmember]) == len(numpy.unique(self.live_pointsp[:,data_mask].flatten())):
-		#	# trivial case: all live points are the same across data sets
-		#	yield data_mask, self.live_pointsp[:,firstmember]
-		#	return
-
+		selected = numpy.where(data_mask)[0]
+		all_selected = len(selected) == len(data_mask)
+		firstmember = selected[0]
+		if len(selected) == 1:
+			# trivial case:
+			# requested only a single slot, so return its live points
+			yield data_mask, self.live_pointsp[:,firstmember]
+			return
+		
+		if not all_selected:
+			allp = numpy.unique(self.live_pointsp[:,selected].flatten())
+		
 		if len(allp) < 2 * self.nlive_points:
+			print 'generate_subsets: only %d unique live points known, so connected' % len(allp)
 			# if fewer than 2*nlive unique points are known, 
 			# some must be shared between data sets.
 			# So no disjoint data sets
 			yield data_mask, allp
 			return
 		
+		if len(self.superpoints) > 0:
+			print 'generate_subsets: %d superpoints known, so connected' % len(self.superpoints)
+			# there are some points shared by all data sets
+			# so no disjoint data sets
+			yield data_mask, allp
+			return
+		
+		self.rebuild_map()
 		to_handle = data_mask.copy()
 		while to_handle.any():
 			firstmember = numpy.where(to_handle)[0][0]
@@ -194,13 +226,9 @@ class MultiNestedSampler(object):
 				if i >= len(member_live_pointsp) or not to_handle.any():
 					break
 				p = member_live_pointsp[i]
-				sharing = (self.live_pointsp[:,to_handle] == p).any(axis=0)
-				#assert len(sharing) == to_handle.sum()
-				newmembers = numpy.where(to_handle)[0][sharing]
-				assert numpy.all(newmembers == numpy.arange(len(to_handle))[to_handle][sharing])
-
-				#print 'new members:', newmembers
-				members += newmembers.tolist()
+				newmembers = [m for m in self.point_data_map[p] if to_handle[m]]
+				print newmembers
+				members += newmembers
 				for newp in numpy.unique(self.live_pointsp[:,newmembers]):
 					if newp not in member_live_pointsp:
 						member_live_pointsp.append(newp)
@@ -213,7 +241,7 @@ class MultiNestedSampler(object):
 			#print 'returning:', member_data_mask, member_live_pointsp
 			yield member_data_mask, member_live_pointsp
 
-	def generate_subsets(self, data_mask, allp):
+	def generate_subsets_graph(self, data_mask, allp):
 		# generate data subsets which share points.
 		selected = numpy.where(data_mask)[0]
 		all_selected = len(selected) == len(data_mask)
@@ -334,7 +362,10 @@ class MultiNestedSampler(object):
 			# it does not make sense to analyse them jointly
 			# so we break them up into membersets here, stringing
 			# together those that do.
-			membersets = list(self.generate_subsets(data_mask, global_live_pointsp))
+			if self.use_graph:
+				membersets = list(self.generate_subsets_graph(data_mask, global_live_pointsp))
+			else:
+				membersets = list(self.generate_subsets_nograph(data_mask, global_live_pointsp))
 			assert len(membersets) > 0
 			if len(membersets) > 1:
 				# if the data is split, regions need to be 
@@ -412,6 +443,9 @@ class MultiNestedSampler(object):
 		Lis = live_pointsL[Lmini, numpy.arange(self.ndata)]
 		if self.membership_graph is not None:
 			self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj) for d, pj in enumerate(pj_old)])
+		if self.point_data_map is not None:
+			for d, pj in enumerate(pj_old):
+				self.point_data_map[pj].remove(d)
 		for pj in numpy.unique(pj_old):
 			# no longer a superpoint, because it is no
 			# longer shared by all data sets
@@ -424,6 +458,8 @@ class MultiNestedSampler(object):
 			live_pointsL[i,d] = Lj
 			if self.membership_graph is not None:
 				self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
+			if self.point_data_map is not None:
+				self.point_data_map[pj].add(d)
 		"""
 		uis = []
 		xis = []

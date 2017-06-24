@@ -111,7 +111,8 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 	ndim=nparams, ndata=ndata,
 	superset_draw_constrained = superset_constrainer.draw_constrained, 
 	draw_constrained = focusset_constrainer.draw_constrained, 
-	nsuperset_draws = int(os.environ.get('SUPERSET_DRAWS', '10'))
+	nsuperset_draws = int(os.environ.get('SUPERSET_DRAWS', '10')),
+	use_graph = os.environ.get('USE_GRAPH', '1') == '1'
 	)
 focusset_constrainer.sampler = sampler
 superset_constrainer.sampler = sampler
