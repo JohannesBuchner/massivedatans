@@ -37,6 +37,17 @@ status_symbols = {
 	15:u"\u2588", 16:u"\u2588", 17:u"\u2588", 18:u"\u2588", 19:u"\u2588", 
 }
 
+def find_nsmallest(n, arr1, arr2):
+	# old version
+	arr = numpy.hstack((arr1, arr2))
+	arr.sort()
+	return arr[n]
+
+def find_nsmallest(n, arr1, arr2):
+	# new version, faster because it does not need to sort everything
+	arr = numpy.concatenate((arr1, arr2))
+	return numpy.partition(arr, n)[n]
+
 class MultiNestedSampler(object):
 	"""
 	Samples points, always replacing the worst live point, forever.
@@ -400,10 +411,7 @@ class MultiNestedSampler(object):
 					# to insert at position n
 					# there must be n elements smaller
 					# in self.shelves[d] and self.live_pointsL[:,d]
-					Lentries = numpy.hstack((live_pointsL[:,d], [Li for _, _, _, Li in self.shelves[d]]))
-					Lentries.sort()
-					# so Lmin should be Lentries[n], because the nth element has to be beaten
-					Lmins_higher[j] = Lentries[n]
+					Lmins_higher[j] = find_nsmallest(n, live_pointsL[:,d], [Li for _, _, _, Li in self.shelves[d]])
 				
 				uj, xj, Lj, n = (self.draw_constrained if use_rebuilding_draw else self.superset_draw_constrained)(
 					Lmins=Lmins_higher, 
@@ -442,50 +450,32 @@ class MultiNestedSampler(object):
 		xis = self.pointpilex[pj_old]
 		Lis = live_pointsL[Lmini, numpy.arange(self.ndata)]
 		if self.membership_graph is not None:
+			print '    deleting edges...'
 			self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj) for d, pj in enumerate(pj_old)])
 		if self.point_data_map is not None:
 			for d, pj in enumerate(pj_old):
 				self.point_data_map[pj].remove(d)
+		print '    dropping superpoints ...'
 		for pj in numpy.unique(pj_old):
 			# no longer a superpoint, because it is no
 			# longer shared by all data sets
 			if pj in self.superpoints:
 				self.superpoints.remove(pj)
+		new_edges = None if self.membership_graph is None else []
+		print '    replacing dead points ...'
 		for d in range(self.ndata):
 			i = Lmini[d]
 			pj, uj, xj, Lj = self.shelves[d].pop(0)
 			self.live_pointsp[i,d] = pj
 			live_pointsL[i,d] = Lj
-			if self.membership_graph is not None:
-				self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
+			if new_edges is not None:
+				new_edges.append(("n%d" % d, "p%d" % pj))
 			if self.point_data_map is not None:
 				self.point_data_map[pj].add(d)
-		"""
-		uis = []
-		xis = []
-		Lis = []
-		for d in range(self.ndata):
-			Lmin = Lmins[d]
-			i = Lmini[d]
-			pj_old = self.live_pointsp[i,d]
-			uis.append(self.pointpile[pj_old])
-			xis.append(self.pointpilex[pj_old])
-			Lis.append(live_pointsL[i,d])
-			if self.membership_graph is not None:
-				self.membership_graph.delete_edges([("n%d" % d, "p%d" % pj_old)])
-			# pj_old is no longer a superpoint, because it is no
-			# longer shared by all data sets
-			if pj_old in self.superpoints:
-				self.superpoints.remove(pj_old)
-			pj, uj, xj, Lj = self.shelves[d].pop(0)
-			assert Lj > Lmin, (Lj, Lmin)
-			self.live_pointsp[i,d] = pj
-			if self.membership_graph is not None:
-				self.membership_graph.add_edge("n%d" % d, "p%d" % pj)
-			live_pointsL[i,d] = Lj
-		"""
+		if self.membership_graph is not None:
+			print '    adding edges ...'
+			self.membership_graph.add_edges(new_edges)
 		self.Lmax = live_pointsL.max(axis=0)
-		#print 'Lmax:', self.Lmax
 		assert self.Lmax.shape == (self.ndata,)
 		print 'advancing done.'
 		return numpy.asarray(uis), numpy.asarray(xis), numpy.asarray(Lis)

@@ -141,7 +141,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		pbar.maxval = i_final.max()
 		#logmaxContribution = logZup - logZ
 		
-		if i > min_samples and i % 10 == 1: # and all(remainderZ - log(100) < logZ):
+		if i > min_samples and i % 50 == 1: # and all(remainderZ - log(100) < logZ):
 		#if i > min_samples:
 			remainderZ, remainderZerr, totalZ, totalZerr, totalZerr_bootstrapped = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running], H[running], sampler.Lmax)
 			# tolerance
