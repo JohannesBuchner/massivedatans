@@ -1,8 +1,5 @@
 import numpy
 import matplotlib.pyplot as plt
-#from nested_sampling.clustering.neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
-from nested_sampling.samplers.hiermetriclearn import ClusterResult, RadFriendsRegion
-
 
 CX = [2, 2.2]
 CSX = [0.5, 0.5] 
@@ -56,10 +53,10 @@ for i in range(len(levels)):
 			N1 += 1
 			N2 += 1
 		elif mask1[j] and N1 < Nlive: 
-			plt.plot(x[j], y[j], '.', color='cyan')
+			plt.plot(x[j], y[j], 'x', color='cyan')
 			N1 += 1
 		elif mask2[j] and N2 < Nlive: 
-			plt.plot(x[j], y[j], '.', color='magenta')
+			plt.plot(x[j], y[j], '+', color='magenta')
 			N2 += 1
 		else:
 			pass
