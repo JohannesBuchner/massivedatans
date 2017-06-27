@@ -250,9 +250,9 @@ The data torrent unleashed by current and upcoming instruments requires
  Importantly, in our method the number of physical model evaluations scales
  sub-linearly with the number of data sets, and we make no assumptions about
  homogeneous errors, Gaussianity, the form of the model or heterogeneity/complet
-eness of the data set.
- Our method has immediate application to speed up analyses of large surveys,
- integral-field-unit analyses, and Monte Carlo simulated data.
+eness of the observations.
+ Our method has immediate application in speeding up analyses of large surveys,
+ integral-field-unit observations, and Monte Carlo simulations.
 \end_layout
 
 \begin_layout Standard
@@ -314,13 +314,13 @@ Big Data has arrived in astronomy.
 \begin_inset Formula $\sim$
 \end_inset
 
-millions of independent sources) were it becomes computationally difficult
+millions of independent sources) where it becomes computationally difficult
  to follow the same approach, even though it is embarrassingly parallel.
  Currently, much effort is put into studying and applying machine learning
  algorithms such as (deep learning) neural networks for the analysis of
  massive datasets.
  This can work well if the measurement errors are homogeneous, but typically
- these method make it difficult to insert existing physical knowledge into
+ these methods make it difficult to insert existing physical knowledge into
  the analysis, to deal with variable errors and missing data points, and
  generally to separate the instrument measurement process from the physical
  effects of interest.
@@ -354,7 +354,7 @@ reference "sec:Results"
 
 \end_inset
 
- I present as an example the line fitting of a hypothetical many-object
+, I present as an example the line fitting of a hypothetical many-object
  spectroscopic survey.
  A more advanced example could include broadened H/O/C line emissions from
  various ionisation states under red noise errors, without modification
@@ -566,8 +566,8 @@ Efficient general solutions exist for drawing a new point above a likelihood
 \end_inset
 
 ).
- The idea is to draw only in the neighbourhood of the live points, which
- already fulfill the likelihood threshold.
+ The idea is to draw only in the neighbourhood of the current live points,
+ which already fulfill the likelihood threshold.
  The best-known algorithm in astrophysics and cosmology is 
 \shape smallcaps
 multinest
@@ -697,12 +697,14 @@ reference "fig:illustration-pointsharing"
 \begin_inset Float figure
 wide false
 sideways false
-status open
+status collapsed
 
 \begin_layout Plain Layout
 \begin_inset Graphics
 	filename plotjointcontour_1.pdf
 	width 100col%
+	BoundingBox 45bp 0bp 369bp 160bp
+	clip
 
 \end_inset
 
@@ -754,7 +756,7 @@ At a later point in the algorithm, the contours may significantly diverge
  This is because the data sets do not have the same best-fit parameters.
  Then, nested sampling runs can continue as in the classic case, and there
  is no speed-up, falling back to a linear scaling.
- This happens earlier the more different the data sets are.
+ This happens earlier, the more different the data sets are.
  The run is longer for data sets with high signal-to-noise, making the algorithm
  efficient when most observations are near the detection limit, as is typically
  the case in surveys (a consequence of powerlaw distributions).
@@ -782,6 +784,15 @@ I now describe the algorithm for simultaneously analysing
 
  data sets.
  The constrained sampler behaves substantially different in our algorithm.
+ A proof-of-concept reference implementation is available at 
+\begin_inset CommandInset href
+LatexCommand href
+name "https://github.com/JohannesBuchner/massivens/"
+target "https://github.com/JohannesBuchner/massivens/"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Subsubsection
@@ -1092,7 +1103,7 @@ reference "fig:graph"
  The necessary graph can be constructed with nodes corresponding to the
  data sets, nodes corresponding to the live points, and connecting the graph
  according to the current live point statuses.
- This introduces some overhead, especially for large 
+ This introduces some computational overhead, especially for large 
 \begin_inset Formula $N$
 \end_inset
 
@@ -1100,9 +1111,10 @@ reference "fig:graph"
 \begin_inset Formula $N_{{\rm live}}$
 \end_inset
 
-, but it can be done lazily when needed.
- A few simple checks can trivially rule out disjoint subsets: If there are
- fewer unique live points across all data sets than 
+, but one can lazily defer graph construction and maintainance until they
+ are actually needed: A few simple checks can trivially rule out disjoint
+ subsets: If there are fewer unique live points across all data sets than
+ 
 \begin_inset Formula $2\times N_{{\rm live}}$
 \end_inset
 
@@ -1123,8 +1135,8 @@ The described analysis of divergence of contours essentially clusters data
  Interestingly, the similarity is not defined in data space, but through
  the constraints in parameter space.
  This clustering improves the efficiency of region draws, as it eliminates
- space between clusters, and improves superset draws because unrelated data
- sets which can not benefit are not pulled in.
+ space between clusters, and improves super-set draws because unrelated
+ data sets, which can not benefit, are not pulled in.
 \end_layout
 
 \begin_layout Section
@@ -1554,7 +1566,7 @@ Bayes factors between the single-line model and a no-line model.
 \end_layout
 
 \begin_layout Standard
-After parameter estimation we can consider model comparison: Is the line
+After parameter estimation we can consider model comparison: is the line
  significantly detected? For this, we consider the Bayes factor, 
 \begin_inset Formula $B=Z_{1}/Z_{0}$
 \end_inset
@@ -1570,7 +1582,7 @@ After parameter estimation we can consider model comparison: Is the line
 
  is the same for the null hypothesis (no line).
  The latter can be analytically computed as 
-\begin_inset Formula $\ln Z_{0}=-\left(\sum(x_{i}/\sigma_{i})^{2}+\ln2\pi\sigma_{i}^{2}\right)/2$
+\begin_inset Formula $\ln Z_{0}=-\frac{1}{2}\left[\sum(x_{i}/\sigma_{i})^{2}+\ln2\pi\sigma_{i}^{2}\right]$
 \end_inset
 
 .
@@ -1651,6 +1663,15 @@ A scalable algorithm for analysing massive data sets with arbitrary physical
  models and complex, inhomogeneous noise properties was presented.
  The algorithm brings parameter estimation with uncertainties, classification
  of objects and distinction between physical processes to the Big Data regime.
+ A reference implementation is available at 
+\begin_inset CommandInset href
+LatexCommand href
+name "https://github.com/JohannesBuchner/massivens/"
+target "https://github.com/JohannesBuchner/massivens/"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Standard
@@ -1773,7 +1794,11 @@ Acknowledgements
 \end_layout
 
 \begin_layout Standard
-We acknowledge support from the CONICYT-Chile grants Basal-CATA PFB-06/2007,
+I thank Surangkhana Rukdee for checking the manuscript for typos.
+\end_layout
+
+\begin_layout Standard
+I acknowledge support from the CONICYT-Chile grants Basal-CATA PFB-06/2007,
  FONDECYT Postdoctorados 3160439 and the Ministry of Economy, Development,
  and Tourism's Millennium Science Initiative through grant IC120009, awarded
  to The Millennium Institute of Astrophysics, MAS.
