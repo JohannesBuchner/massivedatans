@@ -97,7 +97,6 @@ def multi_loglikelihood(params, data_mask):
 
 from multi_nested_integrator import multi_nested_integrator
 from multi_nested_sampler import MultiNestedSampler
-from friends import FriendsConstrainer
 from hiermetriclearn import MetricLearningFriendsConstrainer
 
 numpy.random.seed(1)

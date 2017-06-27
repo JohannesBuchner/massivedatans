@@ -1,11 +1,11 @@
 import numpy
 import scipy.spatial, scipy.cluster
 import matplotlib.pyplot as plt
-from nested_sampling.clustering.neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
-from nested_sampling.clustering.jarvispatrick import jarvis_patrick_clustering, jarvis_patrick_clustering_iterative
-from nested_sampling.clustering.sdml import IdentityMetric, SimpleScaling, TruncatedScaling, SDML
+from clustering.neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
+from clustering.jarvispatrick import jarvis_patrick_clustering, jarvis_patrick_clustering_iterative
+from clustering.sdml import IdentityMetric, SimpleScaling, TruncatedScaling
 from collections import defaultdict
-from nested_sampling.samplers.hiermetriclearn import ClusterResult, RadFriendsRegion
+from clustering.radfriendsregion import ClusterResult, RadFriendsRegion
 
 class MetricLearningFriendsConstrainer(object):
 	"""
@@ -79,10 +79,6 @@ class MetricLearningFriendsConstrainer(object):
 		clustermetric = self.metric
 		print 'computing distances for clustering...'
 		wdists = scipy.spatial.distance.cdist(w, w, metric='euclidean')
-		# apply Jarvis-Patrick clustering
-		print 'Clustering...'
-		#clusters = jarvis_patrick_clustering_iterative(wdists, number_of_neighbors=len(wdists), n_stable_iterations=3)
-		# disable clustering:
 		clusters = [numpy.arange(len(w))]
 		# Overlay all clusters (shift by cluster mean) 
 		print 'Metric update ...'
@@ -103,10 +99,6 @@ class MetricLearningFriendsConstrainer(object):
 			metric = TruncatedScaling()
 			metric.fit(shifted_cluster_members)
 			metric_updated = self.metric == IdentityMetric() or not numpy.all(self.metric.scale == metric.scale)
-		elif self.metriclearner == 'sdml':
-			metric = SDML()
-			metric.fit(shifted_cluster_members, W = numpy.ones((len(w), len(w))))
-			metric_updated = True
 		else:
 			assert False, self.metriclearner
 		
