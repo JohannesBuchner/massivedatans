@@ -38,7 +38,7 @@ class ClusterResult(object):
 		return len(self.clusters)
 
 class RadFriendsRegion(object):
-	def __init__(self, members, maxdistance=None, metric='euclidean', nbootstraps=50, verbose=False):
+	def __init__(self, members, maxdistance=None, metric='euclidean', nbootstraps=10, verbose=False):
 		self.members = members
 		assert metric == 'euclidean'
 		if maxdistance is None:

@@ -103,12 +103,31 @@ numpy.random.seed(1)
 start_time = time.time()
 print 'setting up integrator ...'
 nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
-superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=10, metric_rebuild_every=10, verbose=False, force_shrink=True)
-focusset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', rebuild_every=1, metric_rebuild_every=1, verbose=False)
+superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
+	rebuild_every=20, metric_rebuild_every=20, verbose=False, force_shrink=True)
+focusset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
+	rebuild_every=1, metric_rebuild_every=1, verbose=False)
+individual_constrainers = {}
+individual_constrainers_lastiter = {}
+def individual_draw_constrained(i, it):
+	if i not in individual_constrainers:
+		individual_constrainers[i] = MetricLearningFriendsConstrainer(
+			metriclearner = 'truncatedscaling', force_shrink=True,
+			rebuild_every=20, metric_rebuild_every=20, 
+			verbose=False)
+		individual_constrainers[i].sampler = sampler
+		individual_constrainers_lastiter[i] = it
+	if it > individual_constrainers_lastiter[i] + 20:
+		# force rebuild
+		individual_constrainers[i].region = None
+	individual_constrainers_lastiter[i] = it
+	return individual_constrainers[i].draw_constrained
+
 sampler = MultiNestedSampler(nlive_points = nlive_points, 
 	priortransform=priortransform, multi_loglikelihood=multi_loglikelihood, 
 	ndim=nparams, ndata=ndata,
 	superset_draw_constrained = superset_constrainer.draw_constrained, 
+	individual_draw_constrained = individual_draw_constrained,
 	draw_constrained = focusset_constrainer.draw_constrained, 
 	nsuperset_draws = int(os.environ.get('SUPERSET_DRAWS', '10')),
 	use_graph = os.environ.get('USE_GRAPH', '1') == '1'

@@ -57,7 +57,7 @@ class MultiNestedSampler(object):
 	
 	This class is implemented as an iterator.
 	"""
-	def __init__(self, priortransform, multi_loglikelihood, superset_draw_constrained, draw_constrained, 
+	def __init__(self, priortransform, multi_loglikelihood, superset_draw_constrained, individual_draw_constrained, draw_constrained, 
 			ndata, ndim, nlive_points = 200, draw_global_uniform = None,
 			nsuperset_draws = 10, use_graph=False):
 		self.nlive_points = nlive_points
@@ -66,8 +66,10 @@ class MultiNestedSampler(object):
 		self.real_multi_loglikelihood = multi_loglikelihood
 		self.multi_loglikelihood = multi_loglikelihood
 		self.superset_draw_constrained = superset_draw_constrained
+		self.individual_draw_constrained = individual_draw_constrained
 		self.draw_constrained = draw_constrained
 		#self.samples = []
+		self.global_iter = 0
 		self.ndim = ndim
 		self.ndata = ndata
 		self.superpoints = []
@@ -94,6 +96,7 @@ class MultiNestedSampler(object):
 			live_pointsp[i] = [p]*ndata
 			pointpile.append(u)
 			pointpilex.append(x)
+			self.global_iter += 1
 			#live_pointsu[i] = [u]*ndata
 			#live_pointsx[i] = [x]*ndata
 			live_pointsL[i] = L
@@ -328,6 +331,7 @@ class MultiNestedSampler(object):
 		#live_pointsu = self.live_pointsu
 		#live_pointsx = self.live_pointsx
 		live_pointsL = self.live_pointsL
+		self.global_iter += 1
 		# select worst point, lowest likelihood
 		
 		# there is no globally worst point. 
@@ -390,20 +394,23 @@ class MultiNestedSampler(object):
 				joint_live_pointsu = self.pointpile[joint_live_pointsp]
 				#print 'members:', joint_data_mask.shape, joint_live_pointsu.shape
 				max_draws = 1000
+				njoints = joint_data_mask.sum()
+				joint_indices = numpy.where(joint_data_mask)[0]
+				firstd = joint_indices[0]
 				# if it is the only dataset and we need an entry here, try longer
-				if joint_data_mask.sum() == 1 and len(self.shelves[numpy.where(joint_data_mask)[0][0]]) == 0:
+				if njoints == 1 and len(self.shelves[firstd]) == 0:
 					max_draws = 100000
 				
 				# if there is more than one memberset and this one is full, 
 				# we do not need to do anything
 				# this should be a rare occasion
-				if len(membersets) > 1 and not sample_subset and all([len(self.shelves[d]) > 0 for d in numpy.where(joint_data_mask)[0]]):
+				if len(membersets) > 1 and not sample_subset and all([len(self.shelves[d]) > 0 for d in joint_indices]):
 					continue
 
 				# Lmin needs to be corrected. It is the lowest L, but
 				# this may not be useful for making a draw. 
-				Lmins_higher = Lmins[joint_data_mask].copy()
-				for j, d in enumerate(numpy.where(joint_data_mask)[0]):
+				Lmins_higher = Lmins[joint_indices].copy()
+				for j, d in enumerate(joint_indices):
 					n = len(self.shelves[d])
 					if n == 0:
 						# relevant only for non-empty shelves
@@ -413,7 +420,18 @@ class MultiNestedSampler(object):
 					# in self.shelves[d] and self.live_pointsL[:,d]
 					Lmins_higher[j] = find_nsmallest(n, live_pointsL[:,d], [Li for _, _, _, Li in self.shelves[d]])
 				
-				uj, xj, Lj, n = (self.draw_constrained if use_rebuilding_draw else self.superset_draw_constrained)(
+				if njoints == 1:
+					# only a single data set, we can keep the same region for longer
+					draw_constrained = self.individual_draw_constrained(firstd, self.global_iter)
+				elif use_rebuilding_draw:
+					# a subset, perhaps different then last iteration
+					# need to reconstruct the region from scratch
+					draw_constrained = self.draw_constrained
+				else:
+					# full data set, can keep longer
+					draw_constrained = self.superset_draw_constrained
+				
+				uj, xj, Lj, n = draw_constrained(
 					Lmins=Lmins_higher, 
 					priortransform=self.priortransform, 
 					loglikelihood=lambda params: self.multi_loglikelihood(params, joint_data_mask), 

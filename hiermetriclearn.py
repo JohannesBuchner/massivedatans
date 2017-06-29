@@ -2,38 +2,11 @@ import numpy
 import scipy.spatial, scipy.cluster
 import matplotlib.pyplot as plt
 from clustering.neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
-from clustering.jarvispatrick import jarvis_patrick_clustering, jarvis_patrick_clustering_iterative
 from clustering.sdml import IdentityMetric, SimpleScaling, TruncatedScaling
 from collections import defaultdict
 from clustering.radfriendsregion import ClusterResult, RadFriendsRegion
 
 class MetricLearningFriendsConstrainer(object):
-	"""
-	0) Store unit metric.
-	1) Splits live points into clusters using Jarvis-Patrick K=1 clustering
-	2) Project new clusters onto old clusters for identification tree.
-	   If new cluster encompasses more than one old cluster: 
-	3) Overlay all clusters (shift by cluster mean) and compute new metric (covariance)
-	4) Using original points and new metric, compute RadFriends bootstrapped distance and store
-	5) In each RadFriends cluster, find points.
-        6) If still mono-mode: no problem
-	   If discovered new clusters in (1): store filtering function and cluster assignment
-	   If no new clusters: no problem
-	
-	When point is replaced:
-	1) Check if point is in a cluster that is dying out: 
-	   when point is last in current or previously stored clustering
-	
-	For sampling:
-	1) Draw a new point from a metric-shaped ball from random point
-	2) Filter with previous filtering functions if exist
-	3) Evaluate likelihood
-	
-	For filtering:
-	1) Given a point, check if within metric-shaped ball of a existing point
-	2) Filter with previous filtering functions if exist
-	
-	"""
 	def __init__(self, metriclearner, rebuild_every = 50, metric_rebuild_every = 50, verbose = False,
 			keep_phantom_points=False, optimize_phantom_points=False,
 			force_shrink=False):
@@ -56,22 +29,11 @@ class MetricLearningFriendsConstrainer(object):
 		#self.metricregionhistory = []
 	
 	def cluster(self, u, ndim, keepMetric=False):
-		"""
-		1) Splits live points into clusters using Jarvis-Patrick K=1 clustering
-		2) Project new clusters onto old clusters for identification tree.
-		   If new cluster encompasses more than one old cluster: 
-		3) Overlay all clusters (shift by cluster mean) and compute new metric (covariance)
-		4) Using original points and new metric, compute RadFriends bootstrapped distance and store
-		5) In each RadFriends cluster, find points.
-		6) If still mono-mode: no problem
-		   If discovered new clusters in (1): store filtering function and cluster assignment
-		   If no new clusters: no problem
-		"""
 		w = self.metric.transform(u)
 		prev_region = self.region
 		if keepMetric:
 			self.region = RadFriendsRegion(members=w)
-			if self.force_shrink and self.region.maxdistance > prev_region.maxdistance:
+			if self.force_shrink and prev_region is not None and self.region.maxdistance > prev_region.maxdistance:
 				self.region = RadFriendsRegion(members=w, maxdistance=prev_region.maxdistance)
 			return
 		
