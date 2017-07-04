@@ -113,11 +113,11 @@ def individual_draw_constrained(i, it):
 	if i not in individual_constrainers:
 		individual_constrainers[i] = MetricLearningFriendsConstrainer(
 			metriclearner = 'truncatedscaling', force_shrink=True,
-			rebuild_every=20, metric_rebuild_every=20, 
+			rebuild_every=5, metric_rebuild_every=5, 
 			verbose=False)
 		individual_constrainers[i].sampler = sampler
 		individual_constrainers_lastiter[i] = it
-	if it > individual_constrainers_lastiter[i] + 20:
+	if it > individual_constrainers_lastiter[i] + 5:
 		# force rebuild
 		individual_constrainers[i].region = None
 	individual_constrainers_lastiter[i] = it

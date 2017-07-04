@@ -10,21 +10,6 @@ import progressbar
 import igraph
 from collections import defaultdict
 
-"""
-status_symbols = {0:' ', 1:u"\u2581", 2:u"\u2582", 
-	3:u"\u2583", 4:u"\u2583", 
-	5:u"\u2584", 6:u"\u2584", 7:u"\u2584", 8:u"\u2584", 
-}
-for i in range(8, 16):
-	status_symbols[i+1] = u"\u2585"
-for i in range(16, 32):
-	status_symbols[i+1] = u"\u2586"
-for i in range(32, 64):
-	status_symbols[i+1] = u"\u2587"
-for i in range(64, 128):
-	status_symbols[i+1] = u"\u2588"
-"""
-
 status_symbols = {
 	0:' ', 
 	1:u"\u2581", 
@@ -76,6 +61,8 @@ class MultiNestedSampler(object):
 		# lazy building of graph
 		self.use_graph = use_graph
 		self.membership_graph = None
+		self.last_graph = None
+		self.last_graph_selection = None
 		self.point_data_map = None
 		# draw N starting points from prior
 		pointpile = []
@@ -163,6 +150,8 @@ class MultiNestedSampler(object):
 		# rebuild graph because igraph does not support renaming nodes
 		self.membership_graph = None
 		self.point_data_map = None
+		self.last_graph = None
+		self.last_graph_selection = None
 		#if self.point_data_map is not None:
 		#	for d, s in enumerate(surviving)
 		#		if s: continue
@@ -291,10 +280,25 @@ class MultiNestedSampler(object):
 		else:
 			# need to look at the subgraph with only the selected
 			# dataset nodes
-			#members = self.membership_graph.vs.select(['p%d' % v for v, sel in enumerate(data_mask) if sel])
 			members  = ['n%d' % v for v, sel in enumerate(data_mask) if sel]
 			members += ['p%d' % p for p in allp]
-			graph = self.membership_graph.subgraph(members)
+			# if the previous graph had all these nodes (or more)
+			if self.last_graph is not None and self.last_graph_selection[data_mask].all():
+				# re-using previously cut-down graph
+				# this may speed things up because we have to cut less
+				print 'generate_subsets: re-using previous graph'
+				prevgraph = self.last_graph
+			else:
+				# not a super-set, need to start with whole graph
+				prevgraph = self.membership_graph
+			
+			graph = prevgraph.subgraph(members)
+			self.last_graph = graph
+			self.last_graph_selection = data_mask
+		
+		# we could test here with graph.is_connected() first
+		# but if it is connected,  then it takes as long as clusters()
+		# and if it not connected, we have to call clusters() anyways.
 		subgraphs = graph.clusters()
 		if len(subgraphs) == 0:
 			print 'all_selected', all_selected, ':', selected
@@ -302,6 +306,7 @@ class MultiNestedSampler(object):
 			print 'vertices:', [v.attributes()['name'] for v in graph.vs]
 			print 'members:', members
 			assert False, 'no subgraphs found'
+		
 		if len(subgraphs) == 1:
 			yield data_mask, allp
 			return
@@ -331,6 +336,7 @@ class MultiNestedSampler(object):
 		#live_pointsu = self.live_pointsu
 		#live_pointsx = self.live_pointsx
 		live_pointsL = self.live_pointsL
+		superset_membersets = None
 		self.global_iter += 1
 		# select worst point, lowest likelihood
 		
@@ -377,15 +383,26 @@ class MultiNestedSampler(object):
 			# it does not make sense to analyse them jointly
 			# so we break them up into membersets here, stringing
 			# together those that do.
-			if self.use_graph:
+			
+			# if a previous superset draw did the decomposition already,
+			# just reuse it
+			if superset_membersets is not None and not sample_subset:
+				membersets = superset_membersets
+			elif self.use_graph:
 				membersets = list(self.generate_subsets_graph(data_mask, global_live_pointsp))
 			else:
 				membersets = list(self.generate_subsets_nograph(data_mask, global_live_pointsp))
+			
+			if not sample_subset and superset_membersets is None:
+				# store superset decomposition
+				superset_membersets = membersets
+			
 			assert len(membersets) > 0
 			if len(membersets) > 1:
 				# if the data is split, regions need to be 
 				# rebuilt for every group
 				use_rebuilding_draw = True
+			
 			for ji, (joint_data_mask, joint_live_pointsp) in enumerate(membersets):
 				print 'live point set %d/%d: %d from %d datasets, %s' % (
 					ji+1, len(membersets), len(joint_live_pointsp), 
@@ -473,6 +490,9 @@ class MultiNestedSampler(object):
 		if self.point_data_map is not None:
 			for d, pj in enumerate(pj_old):
 				self.point_data_map[pj].remove(d)
+		# point assignment changed, so can not re-use any more directly
+		self.last_graph = None
+		self.last_graph_selection = None
 		print '    dropping superpoints ...'
 		for pj in numpy.unique(pj_old):
 			# no longer a superpoint, because it is no

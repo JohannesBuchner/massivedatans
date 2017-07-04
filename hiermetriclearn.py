@@ -26,6 +26,7 @@ class MetricLearningFriendsConstrainer(object):
 		self.clusters = None
 		self.direct_draws_efficient = True
 		self.last_cluster_points = None
+		self.prev_maxdistance = None
 		#self.metricregionhistory = []
 	
 	def cluster(self, u, ndim, keepMetric=False):
@@ -33,14 +34,14 @@ class MetricLearningFriendsConstrainer(object):
 		prev_region = self.region
 		if keepMetric:
 			self.region = RadFriendsRegion(members=w)
-			if self.force_shrink and prev_region is not None and self.region.maxdistance > prev_region.maxdistance:
-				self.region = RadFriendsRegion(members=w, maxdistance=prev_region.maxdistance)
+			if self.force_shrink and self.region.maxdistance > self.prev_maxdistance:
+				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
+			self.prev_maxdistance = self.region.maxdistance
 			return
 		
 		metric_updated = False
 		clustermetric = self.metric
 		print 'computing distances for clustering...'
-		wdists = scipy.spatial.distance.cdist(w, w, metric='euclidean')
 		clusters = [numpy.arange(len(w))]
 		# Overlay all clusters (shift by cluster mean) 
 		print 'Metric update ...'
@@ -79,10 +80,10 @@ class MetricLearningFriendsConstrainer(object):
 		print 'Region update ...'
 		
 		self.region = RadFriendsRegion(members=wnew) #, maxdistance=shifted_region.maxdistance)
-		if not metric_updated and self.force_shrink and prev_region is not None:
-			if self.region.maxdistance > prev_region.maxdistance:
-				self.region = RadFriendsRegion(members=w, maxdistance=prev_region.maxdistance)
-		
+		if not metric_updated and self.force_shrink and self.prev_maxdistance is not None:
+			if self.region.maxdistance > self.prev_maxdistance:
+				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
+		self.prev_maxdistance = self.region.maxdistance
 		if oldclusters is None or len(clusters) != len(oldclusters):
 		#if True:
 			# store filter function
@@ -291,12 +292,12 @@ class MetricLearningFriendsConstrainer(object):
 				
 				# if running very inefficient, optimize clustering 
 				#     if we haven't done so at the start
-				if not rebuild and ntoaccept > 100:
+				if not rebuild and ntoaccept > 20:
 					rebuild = True
 					print 'low efficiency is triggering RadFriends rebuild'
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=True)
 					break
-				if not rebuild_metric and ntoaccept > 1000:
+				if not rebuild_metric and ntoaccept > 200:
 					rebuild_metric = True
 					print 'low efficiency is triggering metric rebuild'
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=False)
