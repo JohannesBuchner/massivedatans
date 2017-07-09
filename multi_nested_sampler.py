@@ -493,12 +493,13 @@ class MultiNestedSampler(object):
 		# point assignment changed, so can not re-use any more directly
 		self.last_graph = None
 		self.last_graph_selection = None
-		print '    dropping superpoints ...'
-		for pj in numpy.unique(pj_old):
-			# no longer a superpoint, because it is no
-			# longer shared by all data sets
-			if pj in self.superpoints:
-				self.superpoints.remove(pj)
+		if self.superpoints:
+			print '    dropping superpoints ...'
+			for pj in numpy.unique(pj_old):
+				# no longer a superpoint, because it is no
+				# longer shared by all data sets
+				if pj in self.superpoints:
+					self.superpoints.remove(pj)
 		new_edges = None if self.membership_graph is None else []
 		print '    replacing dead points ...'
 		for d in range(self.ndata):
