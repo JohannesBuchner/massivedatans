@@ -787,8 +787,8 @@ I now describe the algorithm for simultaneously analysing
  A proof-of-concept reference implementation is available at 
 \begin_inset CommandInset href
 LatexCommand href
-name "https://github.com/JohannesBuchner/massivens/"
-target "https://github.com/JohannesBuchner/massivens/"
+name "https://github.com/JohannesBuchner/massivedatans/"
+target "https://github.com/JohannesBuchner/massivedatans/"
 
 \end_inset
 
@@ -1698,8 +1698,8 @@ ties, classification of objects and distinction between physical processes.
  A reference implementation is available at 
 \begin_inset CommandInset href
 LatexCommand href
-name "https://github.com/JohannesBuchner/massivens/"
-target "https://github.com/JohannesBuchner/massivens/"
+name "https://github.com/JohannesBuchner/massivedatans/"
+target "https://github.com/JohannesBuchner/massivedatans/"
 
 \end_inset
 
@@ -1712,7 +1712,7 @@ The key insight in this work is to take advantage of a property specific
  can look similar across similar data sets, and it is permitted to draw
  new points from the union of contours
 \begin_inset Foot
-status open
+status collapsed
 
 \begin_layout Plain Layout
 As in classic nested sampling, the volume shrinkage estimates are valid
