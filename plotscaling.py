@@ -8,8 +8,11 @@ xx = []
 yy = []
 
 for filename in sys.argv[1:]:
-	x = int(filename.split('.')[0].split('_')[-1])
 	data = json.load(open(filename))
+	if 'ndata' in data:
+		x = data['ndata']
+	else:
+		x = int(filename.split('.')[0].split('_')[-1])
 	#y = json.load(open(filename))['ndraws']
 	#if 'duration' not in data:
 	#	continue
@@ -34,7 +37,7 @@ plt.xscale('log')
 #plt.xlim(0.9, 10000)
 plt.xlim(0.8, max(xx)*1.5)
 plt.plot(xx, yy, 'o ', label='our algorithm', color='r')
-plt.legend(loc='lower right', numpoints=1)
+plt.legend(loc='upper left', numpoints=1, prop=dict(size=10))
 plt.savefig('plotscaling.pdf', bbox_inches='tight')
 plt.close()
 

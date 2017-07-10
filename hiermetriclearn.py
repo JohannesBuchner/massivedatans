@@ -123,18 +123,6 @@ class MetricLearningFriendsConstrainer(object):
 		N = 10000
 		while True:
 			#if numpy.random.uniform() < 0.01:
-			if True:
-				# draw from unit cube
-				# this can be efficient if volume still large
-				ntotal = ntotal + N
-				us = numpy.random.uniform(size=(N, ndim))
-				ws = self.metric.transform(us)
-				nnear = self.region.are_inside(ws)
-				#print '  %d of %d accepted' % (nnear.sum(), N)
-				for u in us[nnear,:]:
-					#print 'unit cube draw success:', ntotal
-					yield u, ntotal
-					ntotal = 0
 			if ndim < 40:
 				# draw from radfriends directly
 				for ws, n in self.region.generate(N):
@@ -152,6 +140,18 @@ class MetricLearningFriendsConstrainer(object):
 					#if all([0 <= ui <= 1 for ui in u]):
 					#	yield u, ntotal
 					#	ntotal = 0
+			if False:
+				# draw from unit cube
+				# this can be efficient if volume still large
+				ntotal = ntotal + N
+				us = numpy.random.uniform(size=(N, ndim))
+				ws = self.metric.transform(us)
+				nnear = self.region.are_inside(ws)
+				#print '  %d of %d accepted' % (nnear.sum(), N)
+				for u in us[nnear,:]:
+					#print 'unit cube draw success:', ntotal
+					yield u, ntotal
+					ntotal = 0
 	
 	def rebuild(self, u, ndim, keepMetric=False):
 		if self.last_cluster_points is not None and \

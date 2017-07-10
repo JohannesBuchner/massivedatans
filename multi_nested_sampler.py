@@ -439,11 +439,13 @@ class MultiNestedSampler(object):
 				
 				if njoints == 1:
 					# only a single data set, we can keep the same region for longer
-					draw_constrained = self.individual_draw_constrained(firstd, self.global_iter)
+					real_firstd = numpy.where(self.real_data_mask_all)[0][firstd]
+					draw_constrained = self.individual_draw_constrained(real_firstd, self.global_iter)
 				elif use_rebuilding_draw:
 					# a subset, perhaps different then last iteration
 					# need to reconstruct the region from scratch
-					draw_constrained = self.draw_constrained
+					real_joint_indices = numpy.where(self.real_data_mask_all)[0][joint_indices]
+					draw_constrained = self.draw_constrained(real_joint_indices, self.global_iter)
 				else:
 					# full data set, can keep longer
 					draw_constrained = self.superset_draw_constrained
