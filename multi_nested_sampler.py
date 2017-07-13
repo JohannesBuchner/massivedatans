@@ -445,7 +445,7 @@ class MultiNestedSampler(object):
 					# a subset, perhaps different then last iteration
 					# need to reconstruct the region from scratch
 					real_joint_indices = numpy.where(self.real_data_mask_all)[0][joint_indices]
-					draw_constrained = self.draw_constrained(real_joint_indices, self.global_iter)
+					draw_constrained = self.draw_constrained(real_joint_indices, self.real_data_mask_all, joint_live_pointsp, self.global_iter)
 				else:
 					# full data set, can keep longer
 					draw_constrained = self.superset_draw_constrained

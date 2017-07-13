@@ -106,29 +106,60 @@ class CachedConstrainer(object):
 	Otherwise, constructs a fresh one.
 	"""
 	def __init__(self):
-		self.iter = None
+		self.iter = 0
 		self.prev_prev_prev_generation = {}
 		self.prev_prev_generation = {}
 		self.prev_generation = {}
 		self.curr_generation = {}
-	def get(self, mask, it):
-		k = tuple(mask.tolist())
-		if it != self.iter:
+		self.last_mask = []
+		self.last_points = []
+		self.last_realmask = None
+	
+	def get(self, mask, realmask, points, it):
+		while self.iter < it:
 			# new generation
 			self.prev_prev_prev_generation = self.prev_prev_generation
 			self.prev_prev_generation = self.prev_generation
 			self.prev_generation = self.curr_generation
 			self.curr_generation = {}
+			self.last_mask = []
+			self.last_realmask = None
+			self.last_points = []
+			self.iter += 1
 		
+		# if we only dropped a single (or a few) data sets
+		# compared to the call just before, lets reuse the same
+		# this happens in the focussed draw with 1000s of data sets
+		# where a single data set can accept a point; 
+		# not worth to recompute the region.
+		if self.last_realmask is not None and len(mask) < len(self.last_mask) and \
+			len(mask) > 0.95 * len(self.last_mask) and \
+			len(points) > 0.95 * len(self.last_points) and \
+			numpy.mean(self.last_realmask == realmask) > 0.98:
+			print 're-using previous, similar region (%.1f%% data set overlap, %.1f%% points overlap)' % (numpy.mean(self.last_realmask == realmask) * 100., len(points) * 100. / len(self.last_points), )
+			k = tuple(self.last_mask.tolist())
+			return self.curr_generation[k].draw_constrained
+		print 'not re-using region', (len(mask), len(self.last_mask), len(points), len(self.last_points), (len(mask) < len(self.last_mask), len(mask) > 0.95 * len(self.last_mask), len(points) > 0.95 * len(self.last_points), numpy.mean(self.last_realmask == realmask) ) )
+		# normal operation:
+		k = tuple(mask.tolist())
+		self.last_realmask = realmask
+		self.last_mask = mask
+		self.last_points = points
+		
+		# try to recycle
 		if k in self.curr_generation:
 			pass
 		elif k in self.prev_generation:
+			print 're-using previous1 region'
 			self.curr_generation[k] = self.prev_generation[k]
 		elif k in self.prev_prev_generation:
+			print 're-using previous2 region'
 			self.curr_generation[k] = self.prev_prev_generation[k]
 		elif k in self.prev_prev_prev_generation:
+			print 're-using previous3 region'
 			self.curr_generation[k] = self.prev_prev_prev_generation[k]
 		else:
+			# nothing found, so start from scratch
 			self.curr_generation[k] = MetricLearningFriendsConstrainer(
 				metriclearner = 'truncatedscaling', force_shrink=True,
 				rebuild_every=20, metric_rebuild_every=20, 
@@ -169,7 +200,7 @@ results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samp
 duration = time.time() - start_time
 print 'writing output files ...'
 # store results
-with h5py.File(sys.argv[1] + '.out4.hdf5', 'w') as f:
+with h5py.File(sys.argv[1] + '.out5.hdf5', 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
 	u, x, L, w, mask = zip(*results['weights'])
@@ -184,7 +215,7 @@ with h5py.File(sys.argv[1] + '.out4.hdf5', 'w') as f:
 
 print 'writing statistic ...'
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(sys.argv[1] + '_%d.out4cum.stats.json' % ndata, 'w'), indent=4)
+	open(sys.argv[1] + '_%d.out5cum.stats.json' % ndata, 'w'), indent=4)
 print 'done.'
 
 
