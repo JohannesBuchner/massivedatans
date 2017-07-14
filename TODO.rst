@@ -14,7 +14,7 @@ Currently, the execution speed is limited by two functions:
 
 maxdistance could be optimized by calling it less often. This is
 what sample.CachedConstrainer tries to do. The checks there could be more 
-generous. 
+generous. -> Done, but maybe more optimisation possible?
 
 One could also increase the rebuild_every parameters
 

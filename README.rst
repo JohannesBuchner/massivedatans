@@ -12,6 +12,7 @@ How to run
 ============
 
 You need to install
+
 * python-igraph
 * numpy, scipy
 * gcc
