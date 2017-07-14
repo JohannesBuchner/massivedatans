@@ -3,7 +3,10 @@ CC := gcc
 CFLAGS += -fPIC -std=c99 -Wall -lm -Wextra 
 CFLAGS += -O3
 
-all: clike.so clike-parallel.so
+all: clike.so clike-parallel.so clustering
+
+clustering: 
+	$(MAKE) -C clustering/
 
 %-parallel.so: %.c
 	${CC} ${CFLAGS} -fopenmp -DPARALLEL=1 $< -o $@ -shared
@@ -13,5 +16,5 @@ all: clike.so clike-parallel.so
 clean: 
 	rm *.so
 
-.PHONY: all clean
+.PHONY: all clean clustering
 

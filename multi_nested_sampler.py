@@ -342,25 +342,11 @@ class MultiNestedSampler(object):
 			#	print graph
 
 	def __next__(self):
-		#live_pointsp = self.live_pointsp
-		#live_pointsu = self.live_pointsu
-		#live_pointsx = self.live_pointsx
+		# select worst point, lowest likelihood and replace
 		live_pointsL = self.live_pointsL
 		superset_membersets = None
 		self.global_iter += 1
-		# select worst point, lowest likelihood
 		
-		# there is no globally worst point. 
-		# A point can be worst for one but best for the other.
-		# For the latter it would not make sense to replace it first.
-		# --> need reactive nested sampling to add edges
-		# in that graph, I can always insert, even if not the worst 
-		# point
-		# the edges inserted would be partial, i.e. only valid for some
-		# data -- namely those where the likelihood increased
-		# 
-		#print
-		#print 'housekeeping...'
 		all_global_live_pointsu, all_global_live_pointsp, all_Lmin, Lmins, Lmini = self.prepare()
 		iter = 0
 		while True:

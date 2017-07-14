@@ -237,14 +237,14 @@ begin{abstract}
 The data torrent unleashed by current and upcoming instruments requires
  scalable analysis methods.
  Machine Learning approaches scale well.
- However, separating the instrument measurement errors from the physical
- effects of interest, dealing with variable errors, and deriving parameter
- uncertainties is usually an after-thought.
+ However, separating the instrument measurement from the physical effects
+ of interest, dealing with variable errors, and deriving parameter uncertainties
+ is usually an after-thought.
  Classic forward-folding analyses with Markov Chain Monte Carlo or Nested
  Sampling enable parameter estimation and model comparison, even for complex
  and slow-to-evaluate physical models.
  However, these approaches require independent runs for each data set, implying
- a large number of model evaluations in the Big Data regime.
+ an unfeasible number of model evaluations in the Big Data regime.
  Here we present a new algorithm based on nested sampling, deriving parameter
  probability distributions for each observation.
  Importantly, in our method the number of physical model evaluations scales
@@ -277,21 +277,26 @@ status open
 
 \begin_layout Plain Layout
 
-%
+
 \backslash
 begin{keywords}
 \end_layout
 
 \begin_layout Plain Layout
 
-%
+methods: statistics -- methods: data analysis
 \end_layout
 
 \begin_layout Plain Layout
 
-%
+
 \backslash
 end{keywords}
+\end_layout
+
+\begin_layout Plain Layout
+
+%@arxiver{plotscaling.pdf,plotjointcontour_1.pdf,plotcontour_5.pdf}
 \end_layout
 
 \end_inset
@@ -575,7 +580,7 @@ multinest
  
 \begin_inset CommandInset citation
 LatexCommand citep
-key "Feroz2009"
+key "Shaw2007,Feroz2009"
 
 \end_inset
 
@@ -641,7 +646,7 @@ Simplified description of the idea
 
 \begin_layout Standard
 Consider two independent nested sampling runs on different data sets, but
- initialised to the same random number generator.
+ initialised to the same random number generator state.
  Initially points are generated from across the entire parameter space,
  typically giving bad fits.
  If the data sets are somewhat similar, this phase of zooming to the relevant
@@ -665,8 +670,8 @@ reference "fig:illustration-pointsharing"
 \end_inset
 
 ).
- The speed-up of the algorithm comes from the fact that when a point is
- shared, the (slow) predicting model has to be only evaluated once.
+ When a point is shared, the (slow) predicting model has to be only evaluated
+ once, speeding up the run.
  The model prediction is then compared against the data to produce a likelihood
  for each data set, an operation which I presume to be fast (e.g.
  simply computing 
@@ -736,15 +741,15 @@ The analysis of two similar data sets yields at the same iteration similar
 
 \end_inset
 
-What if the point can be accepted by only one run? It can not simply be
- rejected, otherwise the uniform sampling property of nested sampling is
- broken.
+What if the point can be accepted by only one run? It cannot simply be rejected,
+ otherwise the uniform sampling property of nested sampling is broken.
  Instead, accepted points are stored in queues, one for each run/data set.
  Once both runs have a non-empty queue, the first accepted point is removed
  from each queue and replaces the dead point of each data set.
+ Joint sampling also helps even if a point is not useful right away.
  If a point was only accepted by one run, but the following point is accepted
- by both runs, this second point becomes a live point immediately for one
- run, but can later also become a live point for the other run (if it suffices
+ by both runs, the latter becomes a live point immediately for one run,
+ but can later also become a live point for the other run (if it suffices
  the likelihood threshold at that later iteration).
  This technique allows sustained sharing of points, decreasing the number
  of unique live points and increasing the speed-up.
@@ -753,13 +758,13 @@ What if the point can be accepted by only one run? It can not simply be
 \begin_layout Standard
 At a later point in the algorithm, the contours may significantly diverge
  and not share any live points.
- This is because the data sets do not have the same best-fit parameters.
- Then, nested sampling runs can continue as in the classic case, and there
- is no speed-up, falling back to a linear scaling.
+ This is because the best-fit parameters of data sets will differ.
+ Then, nested sampling runs can continue as in the classic case, without
+ speed-up, falling back to a linear scaling.
  This happens earlier, the more different the data sets are.
  The run is longer for data sets with high signal-to-noise, making the algorithm
- efficient when most observations are near the detection limit, as is typically
- the case in surveys (a consequence of powerlaw distributions).
+ most efficient when most observations are near the detection limit.
+ This is typically the case in surveys (a consequence of powerlaw distributions).
 \end_layout
 
 \begin_layout Subsection
@@ -810,13 +815,13 @@ ons at this point.
 \end_layout
 
 \begin_layout Standard
-Finally the prediction is compared to the individual data sets to produce
+Finally the prediction is compared with the individual data sets to produce
  a likelihood for each considered data set.
  The likelihood at this point can be Gaussian (see above), Poisson (comparing
  the predicted counts to observed counts), a red noise Gaussian process,
  or any other probability distribution as appropriate for the instrument.
- In any case, this computation must be fast compared to producing the model
- predictions to receive any performance gains.
+ In any case, this computation must be fast compared with producing the
+ model predictions to receive any performance gains.
 \end_layout
 
 \begin_layout Subsubsection
@@ -1111,10 +1116,11 @@ reference "fig:graph"
 \begin_inset Formula $N_{{\rm live}}$
 \end_inset
 
-, but one can lazily defer graph construction and maintainance until they
- are actually needed: A few simple checks can trivially rule out disjoint
- subsets: If there are fewer unique live points across all data sets than
- 
+.
+ However, one can lazily defer graph construction and maintenance until
+ they are needed.
+ A few simple checks can trivially rule out disjoint subsets: If there are
+ fewer unique live points across all data sets than 
 \begin_inset Formula $2\times N_{{\rm live}}$
 \end_inset
 
@@ -1130,13 +1136,20 @@ superpoint
 \end_layout
 
 \begin_layout Standard
-The described analysis of divergence of contours essentially clusters data
+The described analysis of divergence of contours effectively clusters data
  sets by similarity.
- Interestingly, the similarity is not defined in data space, but through
- the constraints in parameter space.
- This clustering improves the efficiency of region draws, as it eliminates
+ Interestingly, the similarity is not defined in data space, nor in parameter
+ space, but only through the constraints in parameter space.
+ This is important because clustering in data space can be non-trivial for
+ data with varying errors and completeness, and clustering in parameter
+ space would scale poorly with model dimensionality because it is metric
+ dependent.
+ Instead, the likelihood ordering that makes nested sampling unique is taken
+ advantage of.
+ The clustering improves the efficiency of region draws, as it eliminates
  space between clusters, and improves super-set draws because unrelated
- data sets, which can not benefit, are not pulled in.
+ data sets, which cannot benefit, are not pulled in.
+ 
 \end_layout
 
 \begin_layout Section
@@ -1154,6 +1167,49 @@ name "sec:Results"
 \end_layout
 
 \begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename /mnt/data/daten/PostDoc/research/stats/massivedatans/hornsrun/genhorns.pdf
+	width 100col%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:spectra"
+
+\end_inset
+
+Simulated noisy data.
+ The location, width and amplitude of a single line is sought in Gaussian
+ noise for the illustrative problem.
+ Here we show four spectra, with the true line locations indicated by triangles.
+ The cyan data set shows a random fluctuation at 
+\begin_inset Formula $700{\rm nm}$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
 A simple example problem illustrates the use and scaling of the algorithm.
  We consider a spectroscopic survey which collected 
 \begin_inset Formula $N$
@@ -1212,9 +1268,9 @@ reference "fig:spectra"
 \end_layout
 
 \begin_layout Standard
-For the analysis we define our model parameter space as amplitude, width
- and location of a single Gaussian line, with log-uniform/log-uniform/uniform
- priors from 
+The parameter space of the analysis has three dimensions: The amplitude,
+ width and location of a single Gaussian line, with log-uniform/log-uniform/unif
+orm priors from 
 \begin_inset Formula $10^{0-2}$
 \end_inset
 
@@ -1237,60 +1293,9 @@ slow-to-compute
 
  physical model.
  The likelihood function is a simple product of Gaussian errors.
- A more elaborate example would include physical modelling of a ionised
+ A more elaborate example would include physical modelling of an ionised
  outflow emitting multiple lines with Doppler broadening and red detector
  noise, without necessitating any modification of the presented algorithm.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Float figure
-wide false
-sideways false
-status open
-
-\begin_layout Plain Layout
-\begin_inset Graphics
-	filename /mnt/data/daten/PostDoc/research/stats/massivedatans/hornsrun/genhorns.pdf
-	width 100col%
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Plain Layout
-\begin_inset Caption Standard
-
-\begin_layout Plain Layout
-\begin_inset CommandInset label
-LatexCommand label
-name "fig:spectra"
-
-\end_inset
-
-Simulated noisy data.
- The location, width and amplitude of a single line is sought in Gaussian
- noise for the illustrative problem.
- Here we show four spectra, with the true line locations indicated by triangles.
- The cyan data set shows a random fluctuation at 
-\begin_inset Formula $700{\rm nm}$
-\end_inset
-
-.
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Plain Layout
-
-\end_layout
-
-\end_inset
-
-
 \end_layout
 
 \begin_layout Standard
@@ -1364,8 +1369,6 @@ Number of model evaluations of the algorithm.
 \end_inset
 
  in the considered problem.
- The scatter comes from generating new random data sets every time which
- can randomly differ in their signal-to-noise ratio.
 \end_layout
 
 \end_inset
@@ -1755,6 +1758,7 @@ The algorithm has some overhead related to the management of live points,
 \end_inset
 
 .
+ 
 \end_layout
 
 \begin_layout Standard
@@ -1809,17 +1813,16 @@ key "Kolodzig2012"
  and non-Gaussianity of count data make standard machine learning approaches
  difficult to apply.
  Furthermore, standard fitting techniques can fail to correctly converge
- and individual inspection in the Big Data regime is impractical.
+ and individual visual inspection in the Big Data regime is impractical.
 \end_layout
 
 \begin_layout Standard
 Even in the analysis of single objects the presented algorithm can help.
- One might want to do Monte Carlo simulations of a null hypothesis model
- to test the correctness of decisions to select a more complex model, e.g.
- based on Bayes Factors.
- The presented method allows speedy analysis of such data sets, with a model
- evaluation cost that is essentially independent of the number of generated
- data sets, i.e.
+ One might test the correctness of selecting a more complex model, e.g.
+ based on Bayes Factors, as in the toy example presented.
+ Large Monte Carlo simulations of a null hypothesis model can be quickly
+ analysed with the presented method, with a model evaluation cost that is
+ essentially independent of the number of generated data sets, i.e.
  comparable to the single-object analysis.
 \end_layout
 
@@ -1828,7 +1831,7 @@ Acknowledgements
 \end_layout
 
 \begin_layout Standard
-I thank Surangkhana Rukdee for checking the manuscript for typos.
+I thank Surangkhana Rukdee and Frederik Beaujean for reading the manuscript.
 \end_layout
 
 \begin_layout Standard
@@ -1850,7 +1853,7 @@ Origin and Structure of the Universe
 \begin_layout Standard
 \begin_inset CommandInset bibtex
 LatexCommand bibtex
-bibfiles "/mnt/data/daten/PostDoc/literature/agn,/mnt/data/daten/PostDoc/literature/grb,/mnt/data/daten/PostDoc/literature/sim"
+bibfiles "/mnt/data/daten/PostDoc/literature/agn"
 options "mnras"
 
 \end_inset
