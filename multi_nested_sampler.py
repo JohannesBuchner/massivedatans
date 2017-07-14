@@ -164,11 +164,13 @@ class MultiNestedSampler(object):
 			print 'constructing graph...'
 			graph = igraph.Graph(directed=False)
 			# pointing from live_point to member
+			for i in numpy.where(self.data_mask_all)[0]:
+				graph.add_vertex("n%d" % i, id=i, vtype=0)
 			for p in range(len(self.pointpile)):
-				graph.add_vertex("p%d" % p, pointid=p, vtype=1)
+				graph.add_vertex("p%d" % p, id=p, vtype=1)
 			edges = []
 			for i in numpy.where(self.data_mask_all)[0]:
-				graph.add_vertex("n%d" % i, nodeid=i, vtype=0)
+				#graph.add_vertex("n%d" % i, id=i, vtype=0)
 				edges += [("n%d" % i, "p%d" % p) for p in self.live_pointsp[:,i]]
 			print 'connecting graph ...'
 			graph.add_edges(edges)
@@ -276,36 +278,45 @@ class MultiNestedSampler(object):
 		self.rebuild_graph()
 		if all_selected:
 			graph = self.membership_graph
-			members = None
 		else:
-			# need to look at the subgraph with only the selected
-			# dataset nodes
-			members  = ['n%d' % v for v, sel in enumerate(data_mask) if sel]
-			members += ['p%d' % p for p in allp]
-			# if the previous graph had all these nodes (or more)
-			if self.last_graph is not None and self.last_graph_selection[data_mask].all():
-				# re-using previously cut-down graph
-				# this may speed things up because we have to cut less
-				print 'generate_subsets: re-using previous graph'
-				prevgraph = self.last_graph
-			else:
-				# not a super-set, need to start with whole graph
-				prevgraph = self.membership_graph
-			
-			graph = prevgraph.subgraph(members)
-			self.last_graph = graph
-			self.last_graph_selection = data_mask
+			graph = self._generate_subsets_graph_create_subgraph(data_mask, allp)
 		
+		for sub_data_mask, sub_points in self._generate_subsets_graph_subgraphs(graph, data_mask, all_selected, allp):
+			yield sub_data_mask, sub_points
+	
+	def _generate_subsets_graph_create_subgraph(self, data_mask, allp):
+		# need to look at the subgraph with only the selected
+		# dataset nodes
+		members  = ['n%d' % v for v, sel in enumerate(data_mask) if sel]
+		members += ['p%d' % p for p in allp]
+		# if the previous graph had all these nodes (or more)
+		if self.last_graph is not None and self.last_graph_selection[data_mask].all():
+			# re-using previously cut-down graph
+			# this may speed things up because we have to cut less
+			print 'generate_subsets: re-using previous graph'
+			prevgraph = self.last_graph
+		else:
+			# not a super-set, need to start with whole graph
+			prevgraph = self.membership_graph
+		
+		graph = prevgraph.subgraph(members)
+		self.last_graph = graph
+		self.last_graph_selection = data_mask
+		return graph
+	
+	
+	def _generate_subsets_graph_subgraphs(self, graph, data_mask, all_selected, allp):
 		# we could test here with graph.is_connected() first
 		# but if it is connected,  then it takes as long as clusters()
 		# and if it not connected, we have to call clusters() anyways.
 		subgraphs = graph.clusters()
-		if len(subgraphs) == 0:
-			print 'all_selected', all_selected, ':', selected
-			print graph
-			print 'vertices:', [v.attributes()['name'] for v in graph.vs]
-			print 'members:', members
-			assert False, 'no subgraphs found'
+		assert len(subgraphs) > 0
+		
+		# single-node subgraphs can occur when 
+		# a live point is not used anymore
+		# a real subgraph has to have a data point and its live points, 
+		# so at least nlive_points+1 entries
+		subgraphs = [subgraph for subgraph in subgraphs if len(subgraph) > 1]
 		
 		if len(subgraphs) == 1:
 			yield data_mask, allp
@@ -319,10 +330,10 @@ class MultiNestedSampler(object):
 				att = graph.vs[vi].attributes()
 				#print '    ', att
 				if att['vtype'] == 0:
-					i = att['nodeid']
+					i = att['id']
 					member_data_mask[i] = True
 				else:
-					p = att['pointid']
+					p = att['id']
 					member_live_pointsp.append(p)
 			if member_data_mask.any():
 				yield member_data_mask, member_live_pointsp
@@ -330,7 +341,6 @@ class MultiNestedSampler(object):
 			#	print 'skipping node-free subgraph:', [self.membership_graph.vs[vi].attributes()['name'] for vi in subgraph]
 			#	print graph
 
-	
 	def __next__(self):
 		#live_pointsp = self.live_pointsp
 		#live_pointsu = self.live_pointsu
@@ -464,7 +474,7 @@ class MultiNestedSampler(object):
 				self.ndraws += int(n)
 				ppi = len(self.pointpile)
 				if self.membership_graph is not None:
-					self.membership_graph.add_vertex("p%d" % ppi, pointid=ppi, vtype=1)
+					self.membership_graph.add_vertex("p%d" % ppi, id=ppi, vtype=1)
 				self.pointpile = numpy.vstack((self.pointpile, [uj]))
 				self.pointpilex = numpy.vstack((self.pointpilex, [xj]))
 				nfilled = 0

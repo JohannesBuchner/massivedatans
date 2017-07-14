@@ -10,24 +10,19 @@ class MetricLearningFriendsConstrainer(object):
 	def __init__(self, metriclearner, rebuild_every = 50, metric_rebuild_every = 50, verbose = False,
 			keep_phantom_points=False, optimize_phantom_points=False,
 			force_shrink=False):
-		self.iter = 0
+		self.iter_since_metric_rebuild = 0
+		self.ndraws_since_rebuild = 0
 		self.region = None
 		self.rebuild_every = int(rebuild_every)
 		self.metric_rebuild_every = int(metric_rebuild_every)
-		self.previous_filters = []
 		self.verbose = verbose
-		self.keep_phantom_points = keep_phantom_points
-		self.optimize_phantom_points = optimize_phantom_points
 		self.force_shrink = force_shrink
-		self.phantom_points = []
-		self.phantom_points_Ls = []
 		self.metriclearner = metriclearner
 		self.metric = IdentityMetric()
 		self.clusters = None
 		self.direct_draws_efficient = True
 		self.last_cluster_points = None
 		self.prev_maxdistance = None
-		#self.metricregionhistory = []
 	
 	def cluster(self, u, ndim, keepMetric=False):
 		w = self.metric.transform(u)
@@ -42,13 +37,10 @@ class MetricLearningFriendsConstrainer(object):
 		metric_updated = False
 		clustermetric = self.metric
 		print 'computing distances for clustering...'
-		clusters = [numpy.arange(len(w))]
 		# Overlay all clusters (shift by cluster mean) 
 		print 'Metric update ...'
-		shifted_cluster_members = []
-		for members in clusters:
-			cluster_mean = numpy.mean(u[members,:], axis=0)
-			shifted_cluster_members += (u[members,:] - cluster_mean).tolist()
+		cluster_mean = numpy.mean(u, axis=0)
+		shifted_cluster_members = u - cluster_mean
 		
 		# Using original points and new metric, compute RadFriends bootstrapped distance and store
 		if self.metriclearner == 'none':
@@ -67,16 +59,7 @@ class MetricLearningFriendsConstrainer(object):
 		
 		self.metric = metric
 		
-		oldclusters = self.clusters
-		self.clusters = clusters
-		
 		wnew = self.metric.transform(u)
-		#shifted_cluster_members = []
-		#for members in clusters:
-		#	cluster_mean = numpy.mean(wnew[members,:], axis=0)
-		#	shifted_cluster_members += (wnew[members,:] - cluster_mean).tolist()
-		#shifted_cluster_members = numpy.asarray(shifted_cluster_members)
-		#shifted_region = RadFriendsRegion(members=shifted_cluster_members)
 		print 'Region update ...'
 		
 		self.region = RadFriendsRegion(members=wnew) #, maxdistance=shifted_region.maxdistance)
@@ -84,16 +67,6 @@ class MetricLearningFriendsConstrainer(object):
 			if self.region.maxdistance > self.prev_maxdistance:
 				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
 		self.prev_maxdistance = self.region.maxdistance
-		if oldclusters is None or len(clusters) != len(oldclusters):
-		#if True:
-			# store filter function
-			self.previous_filters.append((self.metric, self.region, ClusterResult(metric=clustermetric, clusters=self.clusters, points=w)))
-		
-		#rfclusters = self.region.get_clusters()
-		#print 'Clustering: JP has %d clusters, radfriends has %d cluster:' % (len(clusters), len(rfclusters))
-		#var = self.iter, self.metric, u, self.region.maxdistance
-		#assert self.is_inside(numpy.array([0.123456]*ndim)), var
-		#assert self.is_inside(numpy.array([0.654321]*ndim)), var
 		print 'done.'
 	
 	def are_inside_cluster(self, points):
@@ -108,18 +81,6 @@ class MetricLearningFriendsConstrainer(object):
 
 	def generate(self, ndim):
 		ntotal = 0
-		"""
-		for w, n in self.region.generate():
-			u = self.metric.untransform(w)
-			ntotal += n
-			#if numpy.all(u >= 0) and numpy.all(u <= 1):
-			if all([0 <= ui <= 1 for ui in u]):
-				yield u, ntotal
-				ntotal = 0
-			else:
-				print 'rejected [box constraint]'
-			
-		"""
 		N = 10000
 		while True:
 			#if numpy.random.uniform() < 0.01:
@@ -157,113 +118,30 @@ class MetricLearningFriendsConstrainer(object):
 		if self.last_cluster_points is not None and \
 			len(self.last_cluster_points) == len(u) and \
 			numpy.all(self.last_cluster_points == u):
-			# nothing
+			# do nothing if everything stayed the same
 			return
-		
-		#for prev_u, prev_region, prev_metric, prev_clusters in self.metricregionhistory[::-1]:
-		#	if prev_u.shape == u.shape and numpy.all(prev_u == u):
-		#		self.region = prev_region
-		#		self.metric = prev_metric
-		#		self.clusters = prev_clusters
-		#		self.generator = self.generate(ndim)
-		#		return
 		
 		self.cluster(u=u, ndim=ndim, keepMetric=keepMetric)
 		self.last_cluster_points = u
-		#if keepMetric is False:
-		#	# store into history only fresh ones with new metric
-		#	self.metricregionhistory.append((u, self.region, self.metric, self.clusters))
-		#	self.metricregionhistory = self.metricregionhistory[-10:]
 		
 		print 'maxdistance:', self.region.maxdistance
 		self.generator = self.generate(ndim)
 	
-	def is_last_of_its_cluster(self, u, uothers):
-		# check if only point of current clustering left
-		w = self.metric.transform(u)
-		wothers = self.metric.transform(uothers)
-		othersregion = RadFriendsRegion(members=wothers, maxdistance=self.region.maxdistance)
-		if not othersregion.is_inside(w):
-			return True
-		
-		# check previous clusterings
-		for metric, region, clusters in self.previous_filters:
-			if clusters.get_n_clusters() < 2:
-				# only one cluster, so can not die out
-				continue
-			
-			# check in which cluster this point was
-			i = clusters.get_cluster_id(u)
-			j = clusters.get_cluster_ids(uothers)
-			#print 'cluster_sets:', i, set(j)
-			if i not in j:
-				# this is the last point of that cluster
-				return True
-		return False
-	
 	def _draw_constrained_prepare(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs):
-		rebuild = self.iter % self.rebuild_every == 0 or self.region is None
-		keepMetric = not (self.iter % self.metric_rebuild_every == 0)
+		rebuild = self.ndraws_since_rebuild > self.rebuild_every or self.region is None
+		rebuild_metric = self.iter_since_metric_rebuild > self.metric_rebuild_every
+		keepMetric = not rebuild_metric
 		if rebuild:
+			print 'rebuild triggered at call'
 			self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=keepMetric)
-		self.iter += 1
+			self.ndraws_since_rebuild = 0
+			if rebuild_metric:
+				self.iter_since_metric_rebuild = 0
+		else:
+			#print 'no rebuild: %d %d' % (self.iter_since_metric_rebuild, self.ndraws_since_rebuild)
+			rebuild_metric = False
 		assert self.generator is not None
-		ntoaccept = 0
-		ntotalsum = 0
-		if self.keep_phantom_points:
-			# check if the currently dying point is the last of a cluster
-			starti = kwargs['starti']
-			ucurrent = live_pointsu[starti]
-			#wcurrent = self.metric.transform(ucurrent)
-			uothers = [ui for i, ui in enumerate(live_pointsu) if i != starti]
-			#wothers = self.metric.transform(uothers)
-			phantom_points_added = False
-			if self.is_last_of_its_cluster(ucurrent, uothers):
-				if self.optimize_phantom_points:
-					print 'optimizing phantom point', ucurrent
-					import scipy.optimize
-					def f(u):
-						w = self.metric.transform(u)
-						if not self.region.is_inside(w):
-							return 1e100
-						x = priortransform(u)
-						L = loglikelihood(x)
-						if self.verbose: print 'OPT %.2f ' % L, u
-						return -L
-					r = scipy.optimize.fmin(f, ucurrent, ftol=0.5, full_output=True)
-					ubest = r[0]
-					Lbest = -r[1]
-					ntoaccept += r[3]
-					print 'optimization gave', r
-					wbest = self.metric.transform(ubest)
-					if not self.is_last_of_its_cluster(ubest, uothers):
-						print 'that optimum is inside the other points, so no need to store'
-					else:
-						print 'remembering phantom point', ubest, Lbest
-						self.phantom_points.append(ubest)
-						self.phantom_points_Ls.append(Lbest)
-						phantom_points_added = True
-				else:
-					print 'remembering phantom point', ucurrent
-					self.phantom_points.append(ucurrent)
-					phantom_points_added = True
-			
-			if phantom_points_added:
-				self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=keepMetric)
-				rebuild = True
-			
-			
-			if self.optimize_phantom_points and len(self.phantom_points) > 0:
-				# purge phantom points that are below Lmin
-				keep = [i for i, Lp in enumerate(self.phantom_points_Ls) if Lp > Lmin]
-				self.phantom_points = [self.phantom_points[i] for i in keep]
-				if len(keep) != len(self.phantom_points_Ls):
-					print 'purging some old phantom points. new:', self.phantom_points, Lmin
-					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=keepMetric)
-					rebuild = True
-					
-				self.phantom_points_Ls = [self.phantom_points_Ls[i] for i in keep]
-		return ntoaccept, ntotalsum, rebuild
+		return rebuild, rebuild_metric
 	
 	def get_Lmax(self):
 		if len(self.phantom_points_Ls) == 0:
@@ -271,7 +149,10 @@ class MetricLearningFriendsConstrainer(object):
 		return max(self.phantom_points_Ls)
 
 	def draw_constrained(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs):
-		ntoaccept, ntotalsum, rebuild = self._draw_constrained_prepare(Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs)
+		ntoaccept = 0
+		ntotalsum = 0
+		self.iter_since_metric_rebuild += 1
+		rebuild = self._draw_constrained_prepare(Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs)
 		rebuild_metric = rebuild
 		while True:
 			for u, ntotal in self.generator:
@@ -280,6 +161,7 @@ class MetricLearningFriendsConstrainer(object):
 				x = priortransform(u)
 				L = loglikelihood(x)
 				ntoaccept += 1
+				self.ndraws_since_rebuild += 1
 
 				#print 'ntotal:', ntotal
 				if ntotal > 100000:
@@ -292,13 +174,16 @@ class MetricLearningFriendsConstrainer(object):
 				
 				# if running very inefficient, optimize clustering 
 				#     if we haven't done so at the start
-				if not rebuild and ntoaccept > 20:
+				if not rebuild and self.ndraws_since_rebuild > self.rebuild_every:
 					rebuild = True
-					print 'low efficiency is triggering RadFriends rebuild'
+					print 'RadFriends rebuild triggered after %d draws' % self.ndraws_since_rebuild
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=True)
+					self.ndraws_since_rebuild = 0
 					break
 				if not rebuild_metric and ntoaccept > 200:
 					rebuild_metric = True
-					print 'low efficiency is triggering metric rebuild'
+					print 'RadFriends metric rebuild triggered after %d draws' % self.ndraws_since_rebuild
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=False)
+					self.iter_since_metric_rebuild = 0
 					break
+				

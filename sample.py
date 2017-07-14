@@ -99,7 +99,7 @@ nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
 # However, there is substantial execution speedup.
 
 superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
-	rebuild_every=20, metric_rebuild_every=20, verbose=False, force_shrink=True)
+	rebuild_every=1000, metric_rebuild_every=20, verbose=False, force_shrink=True)
 class CachedConstrainer(object):
 	"""
 	This keeps metric learners if they are used (in the last three iterations).
@@ -133,13 +133,16 @@ class CachedConstrainer(object):
 		# where a single data set can accept a point; 
 		# not worth to recompute the region.
 		if self.last_realmask is not None and len(mask) < len(self.last_mask) and \
-			len(mask) > 0.95 * len(self.last_mask) and \
-			len(points) > 0.95 * len(self.last_points) and \
-			numpy.mean(self.last_realmask == realmask) > 0.98:
+			len(mask) > 0.80 * len(self.last_mask) and \
+			len(points) <= len(self.last_points) and \
+			len(points) > 0.90 * len(self.last_points) and \
+			numpy.mean(self.last_realmask == realmask) > 0.80 and \
+			numpy.in1d(points, self.last_points).all():
 			print 're-using previous, similar region (%.1f%% data set overlap, %.1f%% points overlap)' % (numpy.mean(self.last_realmask == realmask) * 100., len(points) * 100. / len(self.last_points), )
 			k = tuple(self.last_mask.tolist())
 			return self.curr_generation[k].draw_constrained
-		print 'not re-using region', (len(mask), len(self.last_mask), len(points), len(self.last_points), (len(mask) < len(self.last_mask), len(mask) > 0.95 * len(self.last_mask), len(points) > 0.95 * len(self.last_points), numpy.mean(self.last_realmask == realmask) ) )
+		print 'not re-using region', (len(mask), len(self.last_mask), len(points), len(self.last_points), (len(mask) < len(self.last_mask), len(mask) > 0.80 * len(self.last_mask), len(points) > 0.90 * len(self.last_points), numpy.mean(self.last_realmask == realmask) ) )
+		
 		# normal operation:
 		k = tuple(mask.tolist())
 		self.last_realmask = realmask
@@ -162,7 +165,7 @@ class CachedConstrainer(object):
 			# nothing found, so start from scratch
 			self.curr_generation[k] = MetricLearningFriendsConstrainer(
 				metriclearner = 'truncatedscaling', force_shrink=True,
-				rebuild_every=20, metric_rebuild_every=20, 
+				rebuild_every=1000, metric_rebuild_every=20, 
 				verbose=False)
 			self.curr_generation[k].sampler = sampler
 		
@@ -175,7 +178,7 @@ def individual_draw_constrained(i, it):
 	if i not in individual_constrainers:
 		individual_constrainers[i] = MetricLearningFriendsConstrainer(
 			metriclearner = 'truncatedscaling', force_shrink=True,
-			rebuild_every=20, metric_rebuild_every=20, 
+			rebuild_every=1000, metric_rebuild_every=20, 
 			verbose=False)
 		individual_constrainers[i].sampler = sampler
 		individual_constrainers_lastiter[i] = it
@@ -200,7 +203,7 @@ results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samp
 duration = time.time() - start_time
 print 'writing output files ...'
 # store results
-with h5py.File(sys.argv[1] + '.out5.hdf5', 'w') as f:
+with h5py.File(sys.argv[1] + '.out7.hdf5', 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
 	u, x, L, w, mask = zip(*results['weights'])
@@ -215,7 +218,7 @@ with h5py.File(sys.argv[1] + '.out5.hdf5', 'w') as f:
 
 print 'writing statistic ...'
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(sys.argv[1] + '_%d.out5cum.stats.json' % ndata, 'w'), indent=4)
+	open(sys.argv[1] + '_%d.out7.stats.json' % ndata, 'w'), indent=4)
 print 'done.'
 
 
