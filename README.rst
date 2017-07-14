@@ -15,6 +15,8 @@ You need to install
 
 * python-igraph
 * numpy, scipy
+* h5py
+* progressbar
 * gcc
 
 Then run::

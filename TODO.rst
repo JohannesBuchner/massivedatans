@@ -2,6 +2,11 @@
 TODO
 ============
 
+Non-performance
+-----------------
+
+* Change prints to logging
+
 Performance (single-threaded)
 ------------------------------
 
