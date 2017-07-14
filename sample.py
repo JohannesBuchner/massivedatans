@@ -1,3 +1,20 @@
+"""
+
+Main program
+---------------
+
+Copyright (c) 2017 Johannes Buchner
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+"""
+
 import numpy
 from numpy import exp
 import h5py
@@ -12,31 +29,43 @@ with h5py.File(sys.argv[1], 'r') as f:
 	x = numpy.array(f['x'].value)
 	y = numpy.array(f['y'][:,:ndata])
 
-def gauss(x, z, A, mu, sig):
-	return A * exp(-0.5 * ((mu - x / (1. + z))/sig)**2)
+
+"""
+
+Definition of the problem
+- parameter space (here: 3d)
+- likelihood function which consists of 
+  - model function ("slow predicting function")
+  - data comparison
+
+"""
 
 nx, ndata = y.shape
 noise_level = 0.01
 params = ['A', 'mu', 'sig'] #, 'noise_level']
 nparams = len(params)
+
+def gauss(x, z, A, mu, sig):
+	return A * exp(-0.5 * ((mu - x / (1. + z))/sig)**2)
+
 def priortransform(cube):
+	# definition of the parameter width, by transforming from a unit cube
 	cube = cube.copy()
 	cube[0] = 10**(cube[0] * 2 - 2)
 	cube[1] = cube[1] * 400 + 400
 	cube[2] = cube[2] * 2
 	return cube
 
-def model(params):
-	A, mu, log_sig_kms = params
-	sig = 10**log_sig_kms
-	z = 0
-	ypred = gauss(x, z, A, mu, sig)
-	return ypred
-
+# the following is a python-only implementation of the likelihood 
+# @ params are the parameters (as transformed by priortransform)
+# @ data_mask is which data sets to consider.
+# returns a likelihood vector
 def multi_loglikelihood(params, data_mask):
 	A, mu, log_sig_kms = params
+	# predict the model
 	sig = 10**log_sig_kms
 	ypred = A * exp(-0.5 * ((mu - x)/sig)**2)
+	# do the data comparison
 	L = -0.5 * (((ypred.reshape((-1,1)) - y[:,data_mask])/noise_level)**2).sum(axis=0)
 	return L
 
@@ -44,6 +73,7 @@ def multi_loglikelihood(params, data_mask):
 #print multi_loglikelihood([1.65758829e-01, 4.45518543e+02, 3.25894638e+00], numpy.ones(ndata)==1)
 #print multi_loglikelihood([0.95572931,  443.99407818,    2.95764509], numpy.ones(ndata)==1)
 
+# The following is a C implementation of the likelihood
 from ctypes import *
 from numpy.ctypeslib import ndpointer
 
@@ -64,18 +94,32 @@ lib.like.argtypes = [
 	ndpointer(dtype=numpy.float64, ndim=1, flags='C_CONTIGUOUS'), 
 	]
 
+# @ params are the parameters (as transformed by priortransform)
+# @ data_mask is which data sets to consider.
+# returns a likelihood vector
 def multi_loglikelihood(params, data_mask):
 	A, mu, log_sig_kms = params
 	sig = 10**log_sig_kms
 	Lout = numpy.zeros(data_mask.sum())
+	# do everything in C and return the resulting likelihood vector
 	ret = lib.like(x, y, ndata, nx, A, mu, sig, noise_level, data_mask, Lout)
-	#assert ret == 0, (ret, -0.5*Lout)
-	assert numpy.isfinite(Lout).all(), (Lout, params)
+	#assert numpy.isfinite(Lout).all(), (Lout, params)
 	return -0.5 * Lout
 
 #print multi_loglikelihood([0.88091237,  444.44207558,    2.77671952], numpy.ones(ndata)==1)
 #print multi_loglikelihood([1.65758829e-01, 4.45518543e+02, 3.25894638e+00], numpy.ones(ndata)==1)
 #print multi_loglikelihood([0.95572931,  443.99407818,    2.95764509], numpy.ones(ndata)==1)
+
+"""
+
+After defining the problem, we use generic code to set up 
+- Nested Sampling (Multi)Integrator
+- Our special sampler
+- RadFriends (constrained region draw)
+
+We start with the latter.
+"""
+
 
 from multi_nested_integrator import multi_nested_integrator
 from multi_nested_sampler import MultiNestedSampler
@@ -187,6 +231,8 @@ def individual_draw_constrained(i, it):
 		individual_constrainers[i].region = None
 	individual_constrainers_lastiter[i] = it
 	return individual_constrainers[i].draw_constrained
+
+# now set up sampler and pass the three constrainers
 
 sampler = MultiNestedSampler(nlive_points = nlive_points, 
 	priortransform=priortransform, multi_loglikelihood=multi_loglikelihood, 
