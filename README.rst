@@ -6,7 +6,7 @@ A algorithm for fitting models against many data sets, giving parameter probabil
 The key is that model evaluations are efficiently re-used between data sets,
 making the algorithm scale sub-linearly.
 
-See paper for details.
+See paper for details: https://arxiv.org/abs/1707.04476
 
 How to run
 ============
