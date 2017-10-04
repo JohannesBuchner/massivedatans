@@ -129,14 +129,14 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		i_final = numpy.where(i_final < i+1, i+1, numpy.where(i_final > i+100000, i+100000, i_final))
 		pbar.maxval = max(i+1, i_final.max())
 		
-		if i > min_samples and i % 50 == 1 or i > max_samples:
+		if i > min_samples and i % 50 == 1 or (max_samples and i > max_samples):
 			remainderZ, remainderZerr, totalZ, totalZerr, totalZerr_bootstrapped = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running], H[running], sampler.Lmax)
 			print 'checking for termination:', remainderZ, remainderZerr, totalZ, totalZerr
 			# tolerance
 			last_remainderZ[running] = remainderZ
 			last_remainderZerr[running] = remainderZerr
 			terminating = totalZerr < tolerance
-			if i > max_samples:
+			if max_samples and i > max_samples:
 				terminating[:] = True
 			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
 				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
