@@ -149,9 +149,9 @@ with h5py.File(sys.argv[3]) as f:
 	sfages = f['sfages'].value / 1e9
 	Zs = numpy.log10([0.0001, 0.0004, 0.004, 0.008, 0.02, 0.05, 0.1])
 
-nZ, nSFtau, nSFage, nspec2 = models.shape
+nZ, nSFage, nSFtau, nspec2 = models.shape
 assert nspec2 == nspec
-models /= 1e-10 + models[:,:,:,2000].reshape((nZ, nSFtau, nSFage, 1)) # normalise somewhere to one
+models /= 1e-10 + models[:,:,:,2000].reshape((nZ, nSFage, nSFtau, 1)) # normalise somewhere to one
 
 nspec = 1500
 models = models[:,:,:,500:2000]
@@ -172,7 +172,7 @@ calzetti_result[mask] = 2.659 * (-1.857 + 1.040e3 / wavelength[mask]) + 4.05
 
 import scipy.interpolate
 #model_interp = scipy.interpolate.RegularGridInterpolator([numpy.arange(nZ), numpy.arange(nSFtau), numpy.arange(nSFage)], models)
-model_interp = scipy.interpolate.RegularGridInterpolator([Zs, sftaus, sfages], models)
+model_interp = scipy.interpolate.RegularGridInterpolator([Zs, sfages, sftaus], models)
 
 def model(Z, SFtau, SFage, EBV):
 	#iZ = int(Z)
@@ -180,7 +180,7 @@ def model(Z, SFtau, SFage, EBV):
 	#iSFage = int(SFage)
 	#template = models[iZ, iSFtau, iSFage]
 	#print 'requesting interpolation', Z, SFtau, SFage
-	template = model_interp([Z, SFtau, SFage])[0]
+	template = model_interp([Z, SFage, SFtau])[0]
 	assert template.shape == (nspec,), template.shape
 	# apply calzetti law
 	exttemplate = template * 10**(-2.5 * calzetti_result * EBV)
