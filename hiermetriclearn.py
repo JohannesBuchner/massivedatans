@@ -52,6 +52,7 @@ class MetricLearningFriendsConstrainer(object):
 			if self.force_shrink and self.region.maxdistance > self.prev_maxdistance:
 				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
 			self.prev_maxdistance = self.region.maxdistance
+			print 'keeping metric, not reclustering.'
 			return
 		
 		metric_updated = False
@@ -121,7 +122,7 @@ class MetricLearningFriendsConstrainer(object):
 					#if all([0 <= ui <= 1 for ui in u]):
 					#	yield u, ntotal
 					#	ntotal = 0
-			if False:
+			if numpy.random.uniform() < 0.1:
 				# draw from unit cube
 				# this can be efficient if volume still large
 				ntotal = ntotal + N
@@ -172,9 +173,10 @@ class MetricLearningFriendsConstrainer(object):
 		ntoaccept = 0
 		ntotalsum = 0
 		self.iter_since_metric_rebuild += 1
-		rebuild = self._draw_constrained_prepare(Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs)
-		rebuild_metric = rebuild
+		#print 'MLFriends trying to replace', Lmins
+		rebuild, rebuild_metric = self._draw_constrained_prepare(Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs)
 		while True:
+			#print '    starting generator ...'
 			for u, ntotal in self.generator:
 				assert (u >= 0).all() and (u <= 1).all(), u
 				ntotalsum += ntotal

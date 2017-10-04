@@ -40,13 +40,20 @@ def integrate_remainder(sampler, logwidth, logVolremaining, logZ, H, globalLmax)
 	logZup  = logaddexp(logZ, logV + log(Lmax) + L0)
 	logZlo  = logaddexp(logZ, logV + log(Lmin) + L0)
 	logZerr = logZup - logZlo
+	assert numpy.isfinite(H).all()
+	assert numpy.isfinite(logZerr).all(), logZerr
 
 	for i in range(len(remainder)):
 		ui, xi, Li = remainder[i]
 		wi = logwidth + Li
 		logZnew = logaddexp(logZ, wi)
+		#Hprev = H
 		H = exp(wi - logZnew) * Li + exp(logZ - logZnew) * (H + logZ) - logZnew
+		H[H < 0] = 0
+		#assert (H>0).all(), (H, Hprev, wi, Li, logZ, logZnew)
 		logZ = logZnew
+	
+	#assert numpy.isfinite(logZerr + (H / sampler.nlive_points)**0.5), (H, sampler.nlive_points, logZerr)
 	
 	return logV + logLmid, logZerr, logZmid, logZerr + (H / sampler.nlive_points)**0.5, logZerr + (H / sampler.nlive_points)**0.5
 
@@ -120,14 +127,17 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		# expected number of iterations:
 		i_final = -sampler.nlive_points * (-sampler.Lmax + log(exp(numpy.max([tolerance - logZerr[running], logZerr[running] / 100.], axis=0) + logZ[running]) - exp(logZ[running])))
 		i_final = numpy.where(i_final < i+1, i+1, numpy.where(i_final > i+100000, i+100000, i_final))
-		pbar.maxval = i_final.max()
+		pbar.maxval = max(i+1, i_final.max())
 		
-		if i > min_samples and i % 50 == 1: 
+		if i > min_samples and i % 50 == 1 or i > max_samples:
 			remainderZ, remainderZerr, totalZ, totalZerr, totalZerr_bootstrapped = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running], H[running], sampler.Lmax)
+			print 'checking for termination:', remainderZ, remainderZerr, totalZ, totalZerr
 			# tolerance
 			last_remainderZ[running] = remainderZ
 			last_remainderZerr[running] = remainderZerr
 			terminating = totalZerr < tolerance
+			if i > max_samples:
+				terminating[:] = True
 			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
 				i + 1, pbar.maxval, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
 			if terminating.any():

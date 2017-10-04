@@ -359,6 +359,7 @@ class MultiNestedSampler(object):
 		superset_membersets = None
 		self.global_iter += 1
 		
+		print 'iteration %d' % self.global_iter
 		all_global_live_pointsu, all_global_live_pointsp, all_Lmin, Lmins, Lmini = self.prepare()
 		iter = 0
 		while True:
@@ -448,7 +449,7 @@ class MultiNestedSampler(object):
 				if njoints == 1:
 					# only a single data set, we can keep the same region for longer
 					real_firstd = numpy.where(self.real_data_mask_all)[0][firstd]
-					draw_constrained = self.individual_draw_constrained(real_firstd, self.global_iter)
+					draw_constrained = self.individual_draw_constrained(real_firstd, self.global_iter, sampler=self)
 				elif use_rebuilding_draw:
 					# a subset, perhaps different then last iteration
 					# need to reconstruct the region from scratch
@@ -486,7 +487,7 @@ class MultiNestedSampler(object):
 				print 'accept after %d tries, filled %d shelves' % (n, nfilled)
 			
 			# we got a new point
-			#print 'new point: > %.1f' % Lmins[data_mask].min() #, (Lj>Lmins[data_mask])*1
+			#print 'new point:', Lmins[data_mask], (Lj>Lmins[data_mask])*1
 		
 		# pop: for every data entry, advance one point
 		print 'advancing all...'
