@@ -26,7 +26,7 @@ with h5py.File(filename, 'r') as f:
 		w = w / w.sum()
 		j = numpy.random.choice(jparent, size=100000, p=w)
 		
-		O = f['x'][:,i,0][j]
+		O = numpy.log10(f['x'][:,i,0][j])
 		Z = f['x'][:,i,1][j]
 		SFtau = f['x'][:,i,2][j]
 		SFage = f['x'][:,i,3][j]

@@ -25,7 +25,7 @@ import time
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
-do_plotting = False
+do_plotting = True
 
 print 'loading data...'
 ndata = int(sys.argv[2])
@@ -105,6 +105,9 @@ for j in range(nspec):
 noise_level2[1600:1670,:] += 1e10
 noise_level2[1730:1780,:] += 1e10
 noise_level2[1950:2000,:] += 1e10
+noise_level2[1750+500:2200+500,:] += 1e10
+noise_level2[2300+500:2500+500,:] += 1e10
+#noise_level2[noise_level2 > noise_level.max()] = noise_level.max()
 
 if do_plotting:
 	for i in range(ndata):
@@ -116,15 +119,13 @@ if do_plotting:
 		sigma = noise_level2[:,i]**0.5
 		plt.fill_between(xi, y[:,i] - sigma, y[:,i] + sigma, alpha=0.3, color='gray')
 		idx = numpy.where(noise_level2[:,i] != noise_level[:,i])[0]
-		print idx
 		lo, hi = y[:,i].min(), y[:,i].max()
 		plt.vlines(idx, lo, hi, color='g', alpha=0.1)
 		plt.ylim(lo, hi)
-		plt.xlim(500, 2000)
+		plt.xlim(500, 3500)
 		plt.savefig('musefuse_data%d.pdf' % (i+1), bbox_inches='tight')
 		plt.close()
 
-#noise_level2[noise_level2 > noise_level.max()] = noise_level.max()
 noise_level = noise_level2
 
 """
@@ -153,11 +154,11 @@ nZ, nSFage, nSFtau, nspec2 = models.shape
 assert nspec2 == nspec
 models /= 1e-10 + models[:,:,:,2000].reshape((nZ, nSFage, nSFtau, 1)) # normalise somewhere to one
 
-nspec = 1500
-models = models[:,:,:,500:2000]
-y = y[500:2000,:]
-wavelength = wavelength[500:2000]
-noise_level = noise_level[500:2000,:]
+nspec = 3000
+models = models[:,:,:,500:3500]
+y = y[500:3500,:]
+wavelength = wavelength[500:3500]
+noise_level = noise_level[500:3500,:]
 
 wavelength = wavelength / 10.
 calzetti_result = numpy.zeros_like(wavelength)
@@ -203,6 +204,7 @@ def priortransform(cube):
 # @ data_mask is which data sets to consider.
 # returns a likelihood vector
 Lmax = -1e100
+Lmax = -1e100 * numpy.ones(ndata)
 def multi_loglikelihood(params, data_mask):
 	global Lmax
 	O, Z, SFtau, SFage, EBV = params
@@ -232,8 +234,9 @@ def multi_loglikelihood(params, data_mask):
 		# chi2 = sum[(Oi - s*Mi)^2 / sigmai^2]
 		chi2 = numpy.nansum((yd[:,i] - s * ypred)**2 / vd[:,i]) # + numpy.log(2*numpy.pi*vd))
 		L[i] = -0.5 * chi2 + numpy.random.uniform() * 1e-5
-		if i == 0 and L[i] > Lmax:
-			Lmax = L[i]
+		j = numpy.where(data_mask)[0][i]
+		if L[i] > Lmax[j]:
+			Lmax[j] = L[i]
 			print 'plotting...'
 			plt.figure(figsize=(20,20))
 			plt.subplot(3, 1, 1)
@@ -241,14 +244,15 @@ def multi_loglikelihood(params, data_mask):
 			#mask = vd[:,i] < 2 * numpy.median(vd[:,i])
 			#mask = numpy.isfinite(vd[:,i])
 			mask = Ellipsis
-			plt.plot(yd[mask,i])
-			plt.plot(s * ypred[mask])
+			plt.plot(yd[mask,i], color='k', alpha=0.5)
+			plt.plot(s[i] * ypred[mask], color='r')
 			plt.ylim(yd[mask,i].min(), yd[mask,i].max())
 			plt.subplot(3, 1, 2)
-			plt.plot(ypred[mask])
+			plt.plot(ypred[mask], color='k')
 			plt.subplot(3, 1, 3)
-			plt.plot(vd[mask,i])
-			plt.savefig('musefuse.pdf', bbox_inches='tight')
+			plt.plot(vd[mask,i], color='k')
+			plt.yscale('log')
+			plt.savefig('musefuse_bestfit_%d.pdf' % (i+1), bbox_inches='tight')
 			plt.close()
 			time.sleep(0.1)
 		#print chi2
@@ -256,6 +260,7 @@ def multi_loglikelihood(params, data_mask):
 	return L
 
 def multi_loglikelihood_vectorized(params, data_mask):
+	global Lmax
 	O, Z, SFtau, SFage, EBV = params
 	# predict the model
 	ypred = model(Z, SFtau, SFage, EBV)
@@ -280,6 +285,32 @@ def multi_loglikelihood_vectorized(params, data_mask):
 	L = -0.5 * chi2 + numpy.random.uniform() * 1e-5
 	
 	assert L.shape == (ndata,), (L.shape, ypred.shape, y.shape, data_mask.sum())
+	
+	#for j, i in enumerate(numpy.where(L > Lmax[data_mask])[0]):
+	for j, i in enumerate(numpy.where(data_mask)[0]):
+		if not (L[j] > Lmax[i]): continue
+		Lmax[i] = L[j]
+		if i % (1 + ndata // 3) != 0: continue
+		print 'updating bestfit plot of %d ... chi2: %.2f' % (i+1, chi2[j])
+		#print '   ', yd.shape, yd[:,j].shape, ypred.shape
+		plt.figure(figsize=(20,20))
+		plt.subplot(3, 1, 1)
+		plt.title('%s : chi2: %.2f' % (params, chi2[j]))
+		#mask = vd[:,i] < 2 * numpy.median(vd[:,i])
+		#mask = numpy.isfinite(vd[:,i])
+		mask = Ellipsis
+		plt.plot(yd[mask,j], color='k', alpha=0.5)
+		plt.plot(s[j] * ypred[mask], color='r')
+		plt.ylim(yd[mask,j].min(), yd[mask,j].max())
+		plt.subplot(3, 1, 2)
+		plt.plot(ypred[mask], color='k')
+		plt.subplot(3, 1, 3)
+		plt.plot(vd[mask,j], color='k')
+		plt.yscale('log')
+		plt.savefig('musefuse_bestfit_%d.pdf' % (i+1), bbox_inches='tight')
+		plt.close()
+		time.sleep(0.1)
+
 	return L
 
 if False:
@@ -364,13 +395,15 @@ with h5py.File(sys.argv[1] + '.out_%d.hdf5' % ndata, 'w') as f:
 	f.create_dataset('mask', data=mask, compression='gzip', shuffle=True)
 	f.create_dataset('ndraws', data=sampler.ndraws)
 	f.create_dataset('fiberids', data=goodids[:ndata], compression='gzip', shuffle=True)
+	f.create_dataset('duration', data=duration)
+	f.create_dataset('ndata', data=ndata)
 	
 	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
 	print 'ndraws:', sampler.ndraws, 'niter:', len(w)
 
 print 'writing statistic ...'
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(sys.argv[1] + '_%d.out7.stats.json' % ndata, 'w'), indent=4)
+	open(sys.argv[1] + '.out_%d.stats.json' % ndata, 'w'), indent=4)
 print 'done.'
 
 
