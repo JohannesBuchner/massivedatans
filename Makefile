@@ -3,7 +3,7 @@ CC := gcc
 CFLAGS += -fPIC -std=c99 -Wall -lm -Wextra 
 CFLAGS += -O3
 
-all: clike.so clike-parallel.so clustering
+all: clike.so clike-parallel.so cmuselike.so cmuselike-parallel.so clustering
 
 clustering: 
 	$(MAKE) -C clustering/

@@ -25,7 +25,7 @@ import time
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
-do_plotting = True
+do_plotting = False
 
 print 'loading data...'
 ndata = int(sys.argv[2])
@@ -97,7 +97,7 @@ for j in range(nspec):
 	diff = numpy.abs(noise_level[j,:] - med)
 	v = (diff > 5 * meddiff) * 1e10
 	#k = j
-	if v.any():
+	if False and v.any():
 		print '    updating noise level at', j #, meddiff, diff
 		for k in range(max(0, j-3), min(nspec-1, j+3)+1):
 			noise_level2[k,:] += v
@@ -113,14 +113,16 @@ if do_plotting:
 	for i in range(ndata):
 		plt.figure()
 		xi = numpy.arange(len(y[:,i]))
-		plt.plot(xi, y[:,i], color='k', lw=2)
-		sigma = noise_level[:,i]**0.5
-		plt.fill_between(xi, y[:,i] - sigma, y[:,i] + sigma, alpha=0.3, color='red')
+		plt.plot(xi, y[:,i], color='k', lw=1)
+		sigma0 = noise_level[:,i]**0.5
+		plt.fill_between(xi, y[:,i] - sigma0, y[:,i] + sigma0, alpha=0.3, color='red')
 		sigma = noise_level2[:,i]**0.5
 		plt.fill_between(xi, y[:,i] - sigma, y[:,i] + sigma, alpha=0.3, color='gray')
 		idx = numpy.where(noise_level2[:,i] != noise_level[:,i])[0]
 		lo, hi = y[:,i].min(), y[:,i].max()
-		plt.vlines(idx, lo, hi, color='g', alpha=0.1)
+		plt.plot(xi, lo+sigma0, color='b')
+		plt.plot(xi, lo+0*sigma0, color='b')
+		plt.vlines(idx, lo, hi, color='g', alpha=0.1, lw=0.1)
 		plt.ylim(lo, hi)
 		plt.xlim(500, 3500)
 		plt.savefig('musefuse_data%d.pdf' % (i+1), bbox_inches='tight')
@@ -159,6 +161,8 @@ models = models[:,:,:,500:3500]
 y = y[500:3500,:]
 wavelength = wavelength[500:3500]
 noise_level = noise_level[500:3500,:]
+y = y.astype(numpy.float64).copy()
+noise_level = noise_level.astype(numpy.float64).copy()
 
 wavelength = wavelength / 10.
 calzetti_result = numpy.zeros_like(wavelength)
@@ -245,7 +249,7 @@ def multi_loglikelihood(params, data_mask):
 			#mask = numpy.isfinite(vd[:,i])
 			mask = Ellipsis
 			plt.plot(yd[mask,i], color='k', alpha=0.5)
-			plt.plot(s[i] * ypred[mask], color='r')
+			plt.plot(s * ypred[mask], color='r')
 			plt.ylim(yd[mask,i].min(), yd[mask,i].max())
 			plt.subplot(3, 1, 2)
 			plt.plot(ypred[mask], color='k')
@@ -313,6 +317,75 @@ def multi_loglikelihood_vectorized(params, data_mask):
 
 	return L
 
+def multi_loglikelihood_vectorized_short(params, data_mask):
+	O, Z, SFtau, SFage, EBV = params
+	# predict the model
+	ypred = model(Z, SFtau, SFage, EBV)
+	# do the data comparison
+	if (ypred == 0).all():
+		# give low probability to solutions with no stars
+		return numpy.ones(data_mask.sum()) * -1e100
+	ypred += O
+	
+	yd = y[:,data_mask]
+	vd = noise_level[:,data_mask]
+	ypreds = ypred.reshape((-1,1))
+	s = numpy.sum(yd * ypreds / vd, axis=0) / (numpy.sum(ypreds**2 / vd, axis=0) + 1e-10)
+	chi2 = numpy.sum((yd - s.reshape((1,-1)) * ypreds)**2 / vd, axis=0)
+	L = -0.5 * chi2 + numpy.random.uniform() * 1e-5
+	return L
+
+import numexpr as ne
+def multi_loglikelihood_numexpr(params, data_mask):
+	O, Z, SFtau, SFage, EBV = params
+	# predict the model
+	ypred = model(Z, SFtau, SFage, EBV)
+	# do the data comparison
+	if (ypred == 0).all():
+		# give low probability to solutions with no stars
+		return numpy.ones(data_mask.sum()) * -1e100
+	ypred += O
+	
+	yd = y[:,data_mask]
+	vd = noise_level[:,data_mask]
+	ypreds = ypred.reshape((-1,1))
+	s1 = ne.evaluate("sum(yd * ypreds / vd, axis=0)")
+	s2 = ne.evaluate("sum(ypreds**2 / vd, axis=0)")
+	s = ne.evaluate("s1 / (s2 + 1e-10)").reshape((1,-1))
+	return ne.evaluate("sum((yd - s * ypreds)**2 / (-2 * vd), axis=0)")
+
+from ctypes import *
+from numpy.ctypeslib import ndpointer
+if int(os.environ.get('OMP_NUM_THREADS', '1')) > 1:
+	lib = cdll.LoadLibrary('./cmuselike-parallel.so')
+else:
+	lib = cdll.LoadLibrary('./cmuselike.so')
+lib.like.argtypes = [
+	ndpointer(dtype=numpy.float64, ndim=2, flags='C_CONTIGUOUS'), 
+	ndpointer(dtype=numpy.float64, ndim=2, flags='C_CONTIGUOUS'), 
+	ndpointer(dtype=numpy.float64, ndim=1, flags='C_CONTIGUOUS'), 
+	ndpointer(dtype=numpy.bool, ndim=1, flags='C_CONTIGUOUS'), 
+	c_int, 
+	c_int, 
+	ndpointer(dtype=numpy.float64, ndim=1, flags='C_CONTIGUOUS'), 
+	]
+
+Lout = numpy.zeros(ndata)
+def multi_loglikelihood_clike(params, data_mask):
+	global Lout
+	O, Z, SFtau, SFage, EBV = params
+	# predict the model
+	ypred = model(Z, SFtau, SFage, EBV)
+	# do the data comparison
+	if not numpy.any(ypred):
+		# give low probability to solutions with no stars
+		return numpy.ones(data_mask.sum()) * -1e100
+	ypred += O
+	
+	# do everything in C and return the resulting likelihood vector
+	ret = lib.like(y, noise_level, ypred, data_mask, ndata, nspec, Lout)
+	return Lout[data_mask]
+
 if False:
 	print 'testing vectorised code...'
 	data_mask_all = numpy.ones(ndata) == 1
@@ -322,8 +395,33 @@ if False:
 		L = multi_loglikelihood(params, data_mask_all)
 		L2 = multi_loglikelihood_vectorized(params, data_mask_all)
 		assert numpy.allclose(L, L2), (L, L2, cube, params)
+		L2 = multi_loglikelihood_vectorized_short(params, data_mask_all)
+		assert numpy.allclose(L, L2), (L, L2, cube, params)
+		L2 = multi_loglikelihood_numexpr(params, data_mask_all)
+		assert numpy.allclose(L, L2), (L, L2, cube, params)
+		L2 = multi_loglikelihood_clike(params, data_mask_all)
+		assert numpy.allclose(L, L2), (L, L2, cube, params)
+	test_cubes = [priortransform(numpy.random.uniform(size=nparams)) for i in range(1000)]
+	a = time.time()
+	[multi_loglikelihood(cube, data_mask_all) for cube in test_cubes]
+	print 'original python code:', time.time() - a
+	a = time.time()
+	[multi_loglikelihood_vectorized(cube, data_mask_all) for cube in test_cubes]
+	print 'vectorised python code:', time.time() - a
+	a = time.time()
+	[multi_loglikelihood_vectorized_short(cube, data_mask_all) for cube in test_cubes]
+	print 'shortened vectorised python code:', time.time() - a
+	a = time.time()
+	[multi_loglikelihood_numexpr(cube, data_mask_all) for cube in test_cubes]
+	print 'numexpr code:', time.time() - a
+	a = time.time()
+	[multi_loglikelihood_clike(cube, data_mask_all) for cube in test_cubes]
+	print 'C code:', time.time() - a
+	
 
-multi_loglikelihood = multi_loglikelihood_vectorized
+multi_loglikelihood = multi_loglikelihood_vectorized_short
+multi_loglikelihood = multi_loglikelihood_numexpr
+multi_loglikelihood = multi_loglikelihood_clike
 
 """
 
@@ -338,11 +436,9 @@ We start with the latter.
 
 from multi_nested_integrator import multi_nested_integrator
 from multi_nested_sampler import MultiNestedSampler
-from hiermetriclearn import MetricLearningFriendsConstrainer
-from cachedconstrainer import CachedConstrainer, generate_individual_constrainer
+from cachedconstrainer import CachedConstrainer, generate_individual_constrainer, generate_superset_constrainer
 
-superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
-	rebuild_every=1000, metric_rebuild_every=20, verbose=False, force_shrink=True)
+superset_constrainer = generate_superset_constrainer()
 
 cc = CachedConstrainer()
 focusset_constrainer = cc.get
@@ -380,7 +476,7 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 superset_constrainer.sampler = sampler
 cc.sampler = sampler
 print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0) #, max_samples=5000)
+results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0)
 duration = time.time() - start_time
 print 'writing output files ...'
 # store results

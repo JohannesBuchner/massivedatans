@@ -29,7 +29,7 @@ with h5py.File(filename, 'r') as f:
 		O = numpy.log10(f['x'][:,i,0][j])
 		Z = f['x'][:,i,1][j]
 		SFtau = f['x'][:,i,2][j]
-		SFage = f['x'][:,i,3][j]
+		SFage = numpy.log10(f['x'][:,i,3][j])
 		EBV = f['x'][:,i,4][j]
 		print w.shape, O.shape, Z.shape, SFtau.shape, SFage.shape, EBV.shape
 		data = numpy.transpose([O, Z, SFtau, SFage, EBV])

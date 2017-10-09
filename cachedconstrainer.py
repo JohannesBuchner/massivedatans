@@ -1,5 +1,15 @@
 import numpy
 from hiermetriclearn import MetricLearningFriendsConstrainer
+from elldrawer import MultiEllipsoidalConstrainer
+
+def generate_fresh_constrainer():
+	return MetricLearningFriendsConstrainer(
+		metriclearner = 'truncatedscaling', force_shrink=True,
+		rebuild_every=1000, metric_rebuild_every=20, 
+		verbose=False)
+
+def generate_fresh_constrainer():
+	return MultiEllipsoidalConstrainer(rebuild_every=1000, enlarge=3.)
 
 class CachedConstrainer(object):
 	"""
@@ -7,7 +17,7 @@ class CachedConstrainer(object):
 	Otherwise, constructs a fresh one.
 	"""
 	def __init__(self, sampler=None):
-		self.iter = 0
+		self.iter = -1
 		self.prev_prev_prev_generation = {}
 		self.prev_prev_generation = {}
 		self.prev_generation = {}
@@ -65,10 +75,11 @@ class CachedConstrainer(object):
 			self.curr_generation[k] = self.prev_prev_prev_generation[k]
 		else:
 			# nothing found, so start from scratch
-			self.curr_generation[k] = MetricLearningFriendsConstrainer(
-				metriclearner = 'truncatedscaling', force_shrink=True,
-				rebuild_every=1000, metric_rebuild_every=20, 
-				verbose=False)
+			self.curr_generation[k] = generate_fresh_constrainer()
+			#self.curr_generation[k] = MetricLearningFriendsConstrainer(
+			#	metriclearner = 'truncatedscaling', force_shrink=True,
+			#	rebuild_every=1000, metric_rebuild_every=20, 
+			#	verbose=False)
 			self.curr_generation[k].sampler = self.sampler
 		
 		return self.curr_generation[k].draw_constrained
@@ -78,10 +89,11 @@ def generate_individual_constrainer(rebuild_every=1000, metric_rebuild_every=20)
 	individual_constrainers_lastiter = {}
 	def individual_draw_constrained(i, it, sampler):
 		if i not in individual_constrainers:
-			individual_constrainers[i] = MetricLearningFriendsConstrainer(
-				metriclearner = 'truncatedscaling', force_shrink=True,
-				rebuild_every=rebuild_every, metric_rebuild_every=metric_rebuild_every, 
-				verbose=False)
+			#individual_constrainers[i] = MetricLearningFriendsConstrainer(
+			#	metriclearner = 'truncatedscaling', force_shrink=True,
+			#	rebuild_every=rebuild_every, metric_rebuild_every=metric_rebuild_every, 
+			#	verbose=False)
+			individual_constrainers[i] = generate_fresh_constrainer()
 			individual_constrainers[i].sampler = sampler
 			individual_constrainers_lastiter[i] = it
 		if it > individual_constrainers_lastiter[i] + 5:
@@ -90,4 +102,10 @@ def generate_individual_constrainer(rebuild_every=1000, metric_rebuild_every=20)
 		individual_constrainers_lastiter[i] = it
 		return individual_constrainers[i].draw_constrained
 	return individual_constrainers, individual_constrainers_lastiter, individual_draw_constrained
+
+def generate_superset_constrainer():
+	return generate_fresh_constrainer()
+	#return MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
+	#	rebuild_every=1000, metric_rebuild_every=20, verbose=False, force_shrink=True)
+
 

@@ -95,7 +95,7 @@ class MultiNestedSampler(object):
 			live_pointsp[i] = [p]*ndata
 			pointpile.append(u)
 			pointpilex.append(x)
-			self.global_iter += 1
+			#self.global_iter += 1
 			#live_pointsu[i] = [u]*ndata
 			#live_pointsx[i] = [x]*ndata
 			live_pointsL[i] = L
@@ -357,7 +357,6 @@ class MultiNestedSampler(object):
 		# select worst point, lowest likelihood and replace
 		live_pointsL = self.live_pointsL
 		superset_membersets = None
-		self.global_iter += 1
 		
 		print 'iteration %d' % self.global_iter
 		all_global_live_pointsu, all_global_live_pointsp, all_Lmin, Lmins, Lmini = self.prepare()
@@ -467,6 +466,7 @@ class MultiNestedSampler(object):
 					draw_global_uniform=self.draw_global_uniform,
 					live_pointsu = joint_live_pointsu,
 					max_draws=max_draws,
+					iter=self.global_iter,
 				)
 				
 				# we have a new draw
@@ -491,6 +491,7 @@ class MultiNestedSampler(object):
 		
 		# pop: for every data entry, advance one point
 		print 'advancing all...'
+		self.global_iter += 1
 		pj_old = self.live_pointsp[Lmini,numpy.arange(self.ndata)]
 		uis = self.pointpile[pj_old]
 		xis = self.pointpilex[pj_old]
