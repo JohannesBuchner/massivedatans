@@ -1,8 +1,6 @@
 """
 
-Implementation of RadFriends
-https://arxiv.org/abs/1407.5459
-Uses standardised euclidean distance, which makes it fast.
+Implementation of MultiEllipsoidal sampling via nestle
 
 Copyright (c) 2017 Johannes Buchner
 
@@ -34,7 +32,10 @@ class MultiEllipsoidalConstrainer(object):
 		self.last_cluster_points = None
 	
 	def update(self, points):
-		pointvol = exp(-self.iter / len(points)) / len(points)
+		# volume is larger than standard Ellipsoid computation
+		# because we have a superset of various likelihood contours
+		# increase proportional to number of points
+		pointvol = exp(-self.iter / self.nlive_points) * (len(points) * 1. / self.nlive_points) / self.nlive_points)
 		self.ells = bounding_ellipsoids(numpy.asarray(points), pointvol=pointvol)
 		for ell in self.ells:
 			ell.scale_to_vol(ell.vol * self.enlarge)
@@ -69,9 +70,10 @@ class MultiEllipsoidalConstrainer(object):
 		assert self.generator is not None
 		return rebuild
 	
-	def draw_constrained(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, iter, **kwargs):
+	def draw_constrained(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, iter, nlive_points, **kwargs):
 		ntoaccept = 0
 		self.iter = iter
+		self.nlive_points = nlive_points
 		#print 'MLFriends trying to replace', Lmins
 		rebuild = self._draw_constrained_prepare(Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs)
 		while True:

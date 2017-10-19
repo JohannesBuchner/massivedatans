@@ -467,6 +467,7 @@ class MultiNestedSampler(object):
 					live_pointsu = joint_live_pointsu,
 					max_draws=max_draws,
 					iter=self.global_iter,
+					nlive_points=self.nlive_points
 				)
 				
 				# we have a new draw

@@ -19,6 +19,8 @@ with h5py.File(filename, 'r') as f:
 		print '   %d ...' % i
 		w = f['w'][:,i] + f['L'][:,i]
 		mask = numpy.isfinite(w)
+		if mask.sum() < 4000:
+			continue
 		jparent = numpy.where(mask)[0]
 		w = w[jparent]
 		#print w, w.min(), w.max()
