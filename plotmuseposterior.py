@@ -7,11 +7,6 @@ import h5py
 import scipy.stats
 import corner
 
-def interpolate(grid, v):
-	vi = v.astype(int)
-	vi[vi == len(grid)] = len(grid) - 1
-	return grid[vi]
-
 filename = sys.argv[1]
 with h5py.File(filename, 'r') as f:
 	logZ = f['logZ'].value
