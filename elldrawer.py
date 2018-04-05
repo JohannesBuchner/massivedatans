@@ -35,7 +35,7 @@ class MultiEllipsoidalConstrainer(object):
 		# volume is larger than standard Ellipsoid computation
 		# because we have a superset of various likelihood contours
 		# increase proportional to number of points
-		pointvol = exp(-self.iter / self.nlive_points) * (len(points) * 1. / self.nlive_points) / self.nlive_points)
+		pointvol = exp(-self.iter / self.nlive_points) * (len(points) * 1. / self.nlive_points) / self.nlive_points
 		self.ells = bounding_ellipsoids(numpy.asarray(points), pointvol=pointvol)
 		for ell in self.ells:
 			ell.scale_to_vol(ell.vol * self.enlarge)

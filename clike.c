@@ -43,6 +43,7 @@ int like(
 	const bool * data_mask = (const bool*) data_maskp;
 	adouble * Lout = (adouble*) Loutp;
 	
+	{
 	#ifdef PARALLEL
 	int k = 0;
 	#pragma omp parallel for
@@ -73,7 +74,8 @@ int like(
 			}
 		}
 	}
-	#endif	
+	#endif
+	}
 	IFVERBOSE {
 		int k = 0;
 		for (int i = 0; i < ndata; i++) {

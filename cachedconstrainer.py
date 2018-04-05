@@ -2,12 +2,14 @@ import numpy
 from hiermetriclearn import MetricLearningFriendsConstrainer
 from elldrawer import MultiEllipsoidalConstrainer
 
+# use this for MLFriends (RadFriends, but with standardized Euclidean metric)
 def generate_fresh_constrainer():
 	return MetricLearningFriendsConstrainer(
 		metriclearner = 'truncatedscaling', force_shrink=True,
 		rebuild_every=1000, metric_rebuild_every=20, 
 		verbose=False)
 
+# use this for Ellipsoidal Sampling, like MultiNest
 def generate_fresh_constrainer():
 	return MultiEllipsoidalConstrainer(rebuild_every=1000, enlarge=3.)
 

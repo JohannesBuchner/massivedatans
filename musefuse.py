@@ -28,7 +28,6 @@ import matplotlib.pyplot as plt
 do_plotting = False
 
 print 'loading data...'
-ndata = int(sys.argv[2])
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
@@ -42,23 +41,30 @@ if do_plotting:
 	plt.savefig('musefuse_img0.png', bbox_inches='tight')
 	plt.close()
 
-print 'applying subselection ...'
-y = y[:,80:200,170:240]
-noise_level = noise_level[:,80:200,170:240]
-y = y[:,70:80,35:45]
-noise_level = noise_level[:,70:80,35:45]
-#y = y[:,150:170,145:170]
-#noise_level = noise_level[:,150:170,145:170]
+regionfile = sys.argv[2]
+region = pyregion.parse(open(regionfile).read())
+mask = region.get_mask(shape=(npixx, npixy))
 
+maskx = mask.any(axis=0)
+masky = mask.any(axis=0)
+i = numpy.where(maskx)[0]
+ilo, ihi = i.min(), i.max()
+j = numpy.where(masky)[0]
+jlo, jhi = j.min(), j.max()
+ndata = mask.sum()
+
+ymask = mask.reshape((1,npixx, npixy))
+y[~ymask] = numpy.nan
 if do_plotting:
 	print 'plotting selection ...'
 	plt.figure(figsize=(20,20))
-	plt.imshow(y[0,:,:])
+	plt.imshow(y[0,ilo:ihi,jlo:jhi])
 	plt.savefig('musefuse_sel_img0.png', bbox_inches='tight')
 	plt.close()
 
-nspec, npixx, npixy = y.shape
-
+print 'applying subselection ...'
+y = y[ymask]
+noise_level = noise_level[ymask]
 y = y.reshape((nspec, -1))
 noise_level = noise_level.reshape((nspec, -1))
 x = datasection.header['CD3_3'] * numpy.arange(nspec) + datasection.header['CRVAL3']

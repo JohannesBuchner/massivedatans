@@ -26,33 +26,55 @@ import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
 print 'loading data...'
-ndata = int(sys.argv[2])
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
 noise_level = f['STAT'].data # variance
 nspec, npixx, npixy = y.shape
 
-# TODO: replace with mask
 print 'applying subselection ...'
-y = y[:,80:200,170:240]
-noise_level = noise_level[:,80:200,170:240]
+## replaced by mask
+#y = y[:,80:200,170:240]
+#noise_level = noise_level[:,80:200,170:240]
 #y = y[:,70:80,35:45]
 #noise_level = noise_level[:,70:80,35:45]
-# end TODO
 
-nspec, npixx, npixy = y.shape
+regionfile = sys.argv[2]
+import pyregion
+region = pyregion.parse(open(regionfile).read())
+mask = region.get_mask(shape=(npixx, npixy))
+ymask = numpy.array([mask] * len(y))
+xids, yids = numpy.where(mask)
+y = y[ymask]
+y = y.reshape((nspec, -1))
+noise_level = noise_level[ymask]
+noise_level = noise_level.reshape((nspec, -1))
 
+#nspec, npixx, npixy = y.shape
+print(y.shape)
 outputimg = numpy.zeros((npixx, npixy)) * numpy.nan
 
-y = y.reshape((nspec, -1))
-noise_level = noise_level.reshape((nspec, -1))
-outputimg_flat = outputimg.reshape((-1))
+#y = y.reshape((nspec, -1))
+#noise_level = noise_level.reshape((nspec, -1))
+outputimg_flat = outputimg #.reshape((-1))
 x = datasection.header['CD3_3'] * numpy.arange(nspec) + datasection.header['CRVAL3']
 print '    finding NaNs...'
 good = numpy.isfinite(noise_level).all(axis=0)
-assert good.shape == (npixx*npixy,), good.shape
-goodids = numpy.where(good)[0]
+#assert good.shape == (npixx*npixy,), good.shape
+#goodids = numpy.where(good)[0]
+goodids = list(zip(xids[good], yids[good]))
+print(len(good), len(goodids))
+
+y = y[:,good]
+noise_level = noise_level[:,good]
+ndata = os.environ.get('MAXDATA', len(goodids))
+print '    truncating data to %d sets...' % ndata, goodids[:ndata]
+## truncate data
+y = y[:,:ndata]
+noise_level = noise_level[:,:ndata]
+goodids = goodids[:ndata]
+
+print(y.shape)
 
 filename = sys.argv[1] + '.out_%d.hdf5' % ndata
 f = h5py.File(filename, 'r')
@@ -78,23 +100,25 @@ print weights.shape
 points = numpy.swapaxes(f['x'].value, 0, 1)
 
 for i, (w, logZ, logZerr, x) in enumerate(zip(weights, f['logZ'].value, f['logZerr'].value, points)):
-	pixeli = goodids[i]
+	xi, yi = goodids[i]
 	mask = numpy.isfinite(w)
 	jparent = numpy.where(mask)[0]
 	w = w[jparent]
 	w = numpy.exp(w - w.max())
 	w = w / w.sum()
 	j = numpy.random.choice(jparent, size=4000, p=w)
-	print '   %d/%d: spaxel %d: from %d samples drew %d unique posterior points' % (i+1, nids, pixeli, len(jparent), len(numpy.unique(j)))
+	print '   %d/%d: spaxel %s: from %d samples drew %d unique posterior points' % (i+1, nids, (xi, yi), len(jparent), len(numpy.unique(j)))
 	
-	output_Z[pixeli] = logZ
-	output_Zerr[pixeli] = logZerr
+	print '        logZ = %.1f +- %.1f' % (logZ, logZerr)
+	output_Z[xi, yi] = logZ
+	output_Zerr[xi, yi] = logZerr
 	#x = f['x'][:,i,:]
 	xj = x[j]
 	for k in range(nparams):
 		v = x[:,k]
-		output_means[k][pixeli] = v.mean()
-		output_errs[k][pixeli] = v.std()
+		output_means[k][xi, yi] = v.mean()
+		output_errs[k][xi, yi] = v.std()
+		print '          param %d = %.3f +- %.3f' % (k, v.mean(), v.std())
 	#if i > 1000: break
 
 output_Z = output_Z.reshape((npixx, npixy))
