@@ -451,7 +451,7 @@ def multi_loglikelihood_clike(params, data_mask):
 	
 	# do everything in C and return the resulting likelihood vector
 	ret = lib.like(y, noise_level, ypred, data_mask, ndata, nspec, Lout)
-	return Lout[data_mask]
+	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
 if False:
 	print 'testing vectorised code...'
