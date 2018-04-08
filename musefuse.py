@@ -25,7 +25,7 @@ import time
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
-do_plotting = False
+do_plotting = True
 
 print 'loading data...'
 f = pyfits.open(sys.argv[1])
@@ -79,7 +79,7 @@ good = numpy.isfinite(noise_level).all(axis=0)
 goodids = numpy.where(good)[0]
 #numpy.random.shuffle(goodids)
 
-ndata = os.environ.get('MAXDATA', len(goodids))
+ndata = int(os.environ.get('MAXDATA', len(goodids)))
 print '    truncating data to %d sets...' % ndata, goodids[:ndata]
 ## truncate data
 y = y[:,goodids[:ndata]]
@@ -135,7 +135,7 @@ if do_plotting:
 		plt.plot(xi, lo+0*sigma0, color='b')
 		plt.vlines(idx, lo, hi, color='g', alpha=0.1, lw=0.1)
 		plt.ylim(lo, hi)
-		plt.xlim(500, 3500)
+		#plt.xlim(500, 3500)
 		plt.savefig('musefuse_data%d.pdf' % (i+1), bbox_inches='tight')
 		plt.close()
 
@@ -183,48 +183,68 @@ nSFtau = len(sftaus)
 #assert nspec2 == nspec
 #models /= 1e-10 + models[:,:,:,2000].reshape((nZ, nSFage, nSFtau, 1)) # normalise somewhere to one
 
+"""
 nspec = 3000
 #models = models[:,:,:,500:3500]
 y = y[500:3500,:]
 wavelength = wavelength[500:3500]
 noise_level = noise_level[500:3500,:]
+"""
 y = y.astype(numpy.float64).copy()
 noise_level = noise_level.astype(numpy.float64).copy()
 
 wavelength = wavelength / 10.
-calzetti_result = numpy.zeros_like(wavelength)
-mask = (wavelength < 630)
-calzetti_result[mask] = 2.659 * (-2.156 + 1.509e3 / wavelength[mask] -
-    0.198e6 / wavelength[mask] ** 2 +
-    0.011e9 / wavelength[mask] ** 3) + 4.05
+model_wavelength = model_wavelength / 10.
+calzetti_result = numpy.zeros_like(model_wavelength)
+mask = (model_wavelength < 630)
+calzetti_result[mask] = 2.659 * (-2.156 + 1.509e3 / model_wavelength[mask] -
+    0.198e6 / model_wavelength[mask] ** 2 +
+    0.011e9 / model_wavelength[mask] ** 3) + 4.05
 
 # Attenuation between 630 nm and 2200 nm
-mask = (wavelength >= 630)
-calzetti_result[mask] = 2.659 * (-1.857 + 1.040e3 / wavelength[mask]) + 4.05
+mask = (model_wavelength >= 630)
+calzetti_result[mask] = 2.659 * (-1.857 + 1.040e3 / model_wavelength[mask]) + 4.05
 
 import scipy.interpolate, scipy.ndimage
 
 def model(Z, SFtau, sfage, z, EBV):
-	iZ = numpy.where(Zs < Z)[0][0]
+	iZ = numpy.where(Zs <= Z)[-1][-1]
+	#print('   selecting Z: %d' % iZ) 
 	model_templates = grid[iZ]
+	#print('   template max value:', model_templates.max(), model_templates.shape)
+	assert numpy.all(model_templates>=0), model_templates
 	# convolve the template
 	
 	# SFage = 0-13 (Gyrs).
-	tsinceSF = sfage * 1e9 - ages
-	tsinceSF[ages > sfage] = 0
-	# star formation history is a delayed exponential decline.
+	#print('   selecting sfage: %.2f' % sfage) 
+	# ----123456789SFage________ --age-->
+	tsinceSF = sfage * 1.e9 - ages
+	tsinceSF[tsinceSF <= 0] = 0
+	# star formation history is a (delayed) exponential decline.
+	SFtau = float(SFtau)
+	#print('   selecting SFtau: %.2f' % SFtau) 
 	sfh = tsinceSF / SFtau**2 * numpy.exp(-tsinceSF/SFtau)
+	sfh /= sfh.max()
+	assert numpy.all(sfh>=0), sfh
+	#print('   ages: ', ages)
+	#print('   tsinceSF: ', tsinceSF)
+	#print('   sfh: ', sfh)
 	# before sfage, no stars
-	sfh[ages > sfage] = 0
-	age_weight = ages[:-1] - ages[1:]
+	age_weight = ages[1:] - ages[:-1]
+	assert numpy.all(age_weight>=0), age_weight
 	
 	# weight stellar templates with this SFH
 	#print(model_templates.shape, sfh.shape, age_weight.shape)
 	template = numpy.sum(model_templates[:-1] * \
 		sfh[:-1].reshape((-1,1)) * age_weight.reshape((-1,1)), axis=0)
 	assert template.shape == (len(model_wavelength),), template.shape
+	#print('   template max value after sfh convolution:', template.max())
 	# normalise template at the highest wavelength
 	template /= 1e-10 + template[2050]
+
+	# apply calzetti extinction law at restframe
+	template = template * 10**(-2.5 * calzetti_result * EBV)
+	#print('   template max value after extinction:', template.max())
 	
 	#template = numpy.interp(x=inversewavelength_grid, xp=1./model_wavelength[::-1], fp=template[::-1])
 	#
@@ -244,13 +264,51 @@ def model(Z, SFtau, sfage, z, EBV):
 	# we go to the model at the restframe wavelength, which is bluer
 	# template = numpy.interp(x=wavelength / (1 + z), xp=inversewavelength_grid, fp=template)
 	template = numpy.interp(x=wavelength / (1 + z), xp=model_wavelength, fp=template)
+	#print('   template max value after redshifting:', template.max())
 
 	#template = model_interp([Z, sfage, SFtau])[0]
 	assert template.shape == (nspec,), template.shape
-	# apply calzetti law
-	exttemplate = template * 10**(-2.5 * calzetti_result * EBV)
-	assert numpy.all(numpy.isfinite(exttemplate)), exttemplate
-	return exttemplate
+	#assert numpy.all(numpy.isfinite(exttemplate)), exttemplate
+	return template
+
+if True:
+	#O = 20
+	Z, SFtau, SFage, z, EBV = -2, 1.e8, 1, 0, 0
+	for Z in [-4, -2, -1]:
+		ypred = model(Z, SFtau, SFage, z, EBV)
+		plt.plot(wavelength, ypred, label='Z=%s' % Z)
+	plt.legend(loc='best')
+	plt.savefig('musefuse_model_Z.pdf', bbox_inches='tight')
+	plt.close()
+	Z = -2
+	for SFtau in [6., 6.1, 6.3, 6.5, 7., 8., 9.]:
+		ypred = model(Z, 10**SFtau, SFage, z, EBV)
+		plt.plot(wavelength, ypred, label='SFtau=${10}^{%s}$' % SFtau)
+	plt.legend(loc='best')
+	plt.savefig('musefuse_model_SFtau.pdf', bbox_inches='tight')
+	plt.close()
+	SFtau = 1e8
+	for SFage in [0.001, 0.01, 0.1, 1, 6, 12]:
+		ypred = model(Z, SFtau, SFage, z, EBV)
+		plt.plot(wavelength, ypred, label='SFage=%s' % SFage)
+	plt.legend(loc='best')
+	plt.savefig('musefuse_model_SFage.pdf', bbox_inches='tight')
+	plt.close()
+	SFage = 1
+	for z in [0, 0.1, 0.2, 0.3, 0.4, 0.5]:
+		ypred = model(Z, SFtau, SFage, z, EBV)
+		plt.plot(wavelength, ypred, label='z=%s' % z)
+	plt.legend(loc='best')
+	plt.savefig('musefuse_model_z.pdf', bbox_inches='tight')
+	plt.close()
+	z = 0.
+	for EBV in [0, 0.5, 1]:
+		ypred = model(Z, SFtau, SFage, z, EBV)
+		plt.plot(wavelength, ypred, label='EBV=%s' % EBV)
+	plt.legend(loc='best')
+	plt.savefig('musefuse_model_EBV.pdf', bbox_inches='tight')
+	plt.close()
+
 
 def priortransform(cube):
 	# definition of the parameter width, by transforming from a unit cube
@@ -311,13 +369,13 @@ def multi_loglikelihood(params, data_mask):
 			#mask = vd[:,i] < 2 * numpy.median(vd[:,i])
 			#mask = numpy.isfinite(vd[:,i])
 			mask = Ellipsis
-			plt.plot(yd[mask,i], color='k', alpha=0.5)
-			plt.plot(s * ypred[mask], color='r')
+			plt.plot(wavelength, yd[mask,i], color='k', alpha=0.5)
+			plt.plot(wavelength, s * ypred[mask], color='r')
 			plt.ylim(yd[mask,i].min(), yd[mask,i].max())
 			plt.subplot(3, 1, 2)
-			plt.plot(ypred[mask], color='k')
+			plt.plot(wavelength, ypred[mask], color='k')
 			plt.subplot(3, 1, 3)
-			plt.plot(vd[mask,i], color='k')
+			plt.plot(wavelength, vd[mask,i], color='k')
 			plt.yscale('log')
 			plt.savefig('musefuse_bestfit_%d.pdf' % (i+1), bbox_inches='tight')
 			plt.close()
@@ -367,13 +425,13 @@ def multi_loglikelihood_vectorized(params, data_mask):
 		#mask = vd[:,i] < 2 * numpy.median(vd[:,i])
 		#mask = numpy.isfinite(vd[:,i])
 		mask = Ellipsis
-		plt.plot(yd[mask,j], color='k', alpha=0.5)
-		plt.plot(s[j] * ypred[mask], color='r')
+		plt.plot(wavelength, yd[mask,j], color='k', alpha=0.5)
+		plt.plot(wavelength, s[j] * ypred[mask], color='r')
 		plt.ylim(yd[mask,j].min(), yd[mask,j].max())
 		plt.subplot(3, 1, 2)
-		plt.plot(ypred[mask], color='k')
+		plt.plot(wavelength, ypred[mask], color='k')
 		plt.subplot(3, 1, 3)
-		plt.plot(vd[mask,j], color='k')
+		plt.plot(wavelength, vd[mask,j], color='k')
 		plt.yscale('log')
 		plt.savefig('musefuse_bestfit_%d.pdf' % (i+1), bbox_inches='tight')
 		plt.close()
@@ -454,8 +512,8 @@ def multi_loglikelihood_clike(params, data_mask):
 	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
 if False:
-	print 'testing vectorised code...'
 	data_mask_all = numpy.ones(ndata) == 1
+	print 'testing vectorised code...'
 	for i in range(100):
 		cube = numpy.random.uniform(size=nparams)
 		params = priortransform(cube)
@@ -484,11 +542,10 @@ if False:
 	a = time.time()
 	[multi_loglikelihood_clike(cube, data_mask_all) for cube in test_cubes]
 	print 'C code:', time.time() - a
-	
 
-multi_loglikelihood = multi_loglikelihood_vectorized_short
-multi_loglikelihood = multi_loglikelihood_numexpr
-multi_loglikelihood = multi_loglikelihood_clike
+#multi_loglikelihood = multi_loglikelihood_vectorized_short
+#multi_loglikelihood = multi_loglikelihood_numexpr
+#multi_loglikelihood = multi_loglikelihood_clike
 
 """
 
