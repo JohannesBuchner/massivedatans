@@ -545,7 +545,7 @@ if False:
 
 #multi_loglikelihood = multi_loglikelihood_vectorized_short
 #multi_loglikelihood = multi_loglikelihood_numexpr
-#multi_loglikelihood = multi_loglikelihood_clike
+multi_loglikelihood = multi_loglikelihood_clike
 
 """
 
