@@ -99,6 +99,8 @@ print weights.shape
 #		yield x[:,i,:]
 points = numpy.swapaxes(f['x'].value, 0, 1)
 
+paramnames = ['O', 'Z', 'logSFtau', 'SFage', 'z', 'EBV']
+
 for i, (w, logZ, logZerr, x) in enumerate(zip(weights, f['logZ'].value, f['logZerr'].value, points)):
 	xi, yi = goodids[i]
 	mask = numpy.isfinite(w)
@@ -118,7 +120,7 @@ for i, (w, logZ, logZerr, x) in enumerate(zip(weights, f['logZ'].value, f['logZe
 		v = x[:,k]
 		output_means[k][xi, yi] = v.mean()
 		output_errs[k][xi, yi] = v.std()
-		print '          param %d = %.3f +- %.3f' % (k, v.mean(), v.std())
+		print '          param %d (%s) = %.3f +- %.3f' % (k, paramnames.get(k), v.mean(), v.std())
 	#if i > 1000: break
 
 output_Z = output_Z.reshape((npixx, npixy))

@@ -323,6 +323,14 @@ def priortransform(cube):
 	#cube[8] = cube[8] * 4 - 1 # misfit
 	return cube
 
+def priortransform_simple(cube):
+	# definition of the parameter width, by transforming from a unit cube
+	cube = cube.copy()
+	cube[0] = cube[0] * (sftaus.max() - sftaus.min()) + sftaus.min()
+	cube[1] = cube[1] * (sfages.max() - sfages.min()) + sfages.min()
+	cube[2] = cube[2] * (zhi - zlo) + zlo # z
+	return cube
+
 # the following is a python-only implementation of the likelihood 
 # @ params are the parameters (as transformed by priortransform)
 # @ data_mask is which data sets to consider.
@@ -511,6 +519,14 @@ def multi_loglikelihood_clike(params, data_mask):
 	ret = lib.like(y, noise_level, ypred, data_mask, ndata, nspec, Lout)
 	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
+def multi_loglikelihood_simple_clike(params, data_mask):
+	logSFtau, SFage, z = params
+	O = 0
+	Z = 0.012
+	EBV = 0
+	params = O, Z, logSFtau, SFage, z, EBV
+	return multi_loglikelihood_clike(params, data_mask)
+
 if False:
 	data_mask_all = numpy.ones(ndata) == 1
 	print 'testing vectorised code...'
@@ -546,6 +562,17 @@ if False:
 #multi_loglikelihood = multi_loglikelihood_vectorized_short
 #multi_loglikelihood = multi_loglikelihood_numexpr
 multi_loglikelihood = multi_loglikelihood_clike
+
+prefix = sys.argv[1]
+
+if os.environ.get('SIMPLE', '') == 'YES':
+	print('Switching to simple model')
+	multi_loglikelihood = multi_loglikelihood_simple_clike
+	priortransform = priortransform_simple
+	params = ['logSFtau', 'SFage', 'z']
+	nparams = len(params)
+	prefix = prefix + '_simple_'
+
 
 """
 
@@ -600,11 +627,11 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 superset_constrainer.sampler = sampler
 cc.sampler = sampler
 print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0)
+results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0, max_samples=7000)
 duration = time.time() - start_time
 print 'writing output files ...'
 # store results
-with h5py.File(sys.argv[1] + '.out_%d.hdf5' % ndata, 'w') as f:
+with h5py.File(prefix + '.out_%d.hdf5' % ndata, 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
 	u, x, L, w, mask = zip(*results['weights'])
@@ -623,7 +650,7 @@ with h5py.File(sys.argv[1] + '.out_%d.hdf5' % ndata, 'w') as f:
 
 print 'writing statistic ...'
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(sys.argv[1] + '.out_%d.stats.json' % ndata, 'w'), indent=4)
+	open(prefix + '.out_%d.stats.json' % ndata, 'w'), indent=4)
 print 'done.'
 
 
