@@ -126,7 +126,7 @@ for i, (w, logZ, logZerr, x) in enumerate(zip(weights, f['logZ'].value, f['logZe
 		v = xequal[:,k]
 		output_means[k][xi, yi] = v.mean()
 		output_errs[k][xi, yi] = v.std()
-		print '          param %d (%s) = %.3f +- %.3f' % (k, paramnames[k], v.mean(), v.std())
+		print '          param %d = %.3f +- %.3f (%s)' % (k, v.mean(), v.std(), paramnames[k])
 	if i < 5:
 		numpy.savetxt(prefix + '.outsamples_%d.txt' % i, xequal)
 	#if i > 1000: break
