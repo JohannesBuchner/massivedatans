@@ -31,8 +31,14 @@ print 'loading data...'
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
+#y = y[:3600,:,:]
 nspec, npixx, npixy = y.shape
 noise_level = f['STAT'].data # variance
+#noise_level = noise_level[:3600,:,:]
+good = numpy.isfinite(noise_level).all(axis=0)
+print '   %.2f%% good...' % (100*good.mean())
+#print numpy.where(~numpy.isfinite(noise_level[:,40,40]))
+#print noise_level[~numpy.isfinite(noise_level[:,40,40]),40,40]
 
 if do_plotting:
 	print 'plotting image...'
@@ -52,6 +58,7 @@ i = numpy.where(maskx)[0]
 ilo, ihi = i.min(), i.max() + 1
 j = numpy.where(masky)[0]
 jlo, jhi = j.min(), j.max() + 1
+print(mask.sum(), ilo, ihi, jlo, jhi, y.shape, npixx, npixy)
 #ndata = mask.sum()
 
 #ymask = mask.reshape((1, npixx, npixy))
@@ -68,6 +75,7 @@ if do_plotting:
 print 'applying subselection ...'
 y = y[ymask]
 noise_level = noise_level[ymask]
+print '    subselection gave %s ...' % (y.shape)
 y = y.reshape((nspec, -1))
 noise_level = noise_level.reshape((nspec, -1))
 x = datasection.header['CD3_3'] * numpy.arange(nspec) + datasection.header['CRVAL3']
@@ -75,6 +83,7 @@ wavelength = x
 #good = numpy.logical_and(numpy.isfinite(noise_level).all(axis=0), numpy.isfinite(y).all(axis=0))
 print '    finding NaNs...'
 good = numpy.isfinite(noise_level).all(axis=0)
+print '    found %d finite spaxels ...' % (good.sum())
 #assert good.shape == (ymask.sum(),), good.shape
 goodids = numpy.where(good)[0]
 #numpy.random.shuffle(goodids)
@@ -88,6 +97,8 @@ assert (noise_level>0).all(), noise_level
 
 assert y.shape == (nspec, ndata), (y.shape, nspec, ndata)
 assert noise_level.shape == (nspec, ndata)
+
+assert ndata > 0, 'No valid data!?'
 
 #noise_level[noise_level > 2 * numpy.median(vd[:,i]] = 1000
 
@@ -326,9 +337,10 @@ def priortransform(cube):
 def priortransform_simple(cube):
 	# definition of the parameter width, by transforming from a unit cube
 	cube = cube.copy()
-	cube[0] = cube[0] * (sftaus.max() - sftaus.min()) + sftaus.min()
-	cube[1] = cube[1] * (sfages.max() - sfages.min()) + sfages.min()
-	cube[2] = cube[2] * (zhi - zlo) + zlo # z
+	cube[0] = 10**(cube[0] * 4 - 2) # plateau
+	cube[1] = cube[1] * (sftaus.max() - sftaus.min()) + sftaus.min()
+	cube[2] = cube[2] * (sfages.max() - sfages.min()) + sfages.min()
+	cube[3] = cube[3] * (zhi - zlo) + zlo # z
 	return cube
 
 # the following is a python-only implementation of the likelihood 
@@ -520,8 +532,7 @@ def multi_loglikelihood_clike(params, data_mask):
 	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
 def multi_loglikelihood_simple_clike(params, data_mask):
-	logSFtau, SFage, z = params
-	O = 0
+	O, logSFtau, SFage, z = params
 	Z = 0.012
 	EBV = 0
 	params = O, Z, logSFtau, SFage, z, EBV
@@ -569,7 +580,7 @@ if os.environ.get('SIMPLE', '') == 'YES':
 	print('Switching to simple model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
 	priortransform = priortransform_simple
-	params = ['logSFtau', 'SFage', 'z']
+	params = ['O', 'logSFtau', 'SFage', 'z']
 	nparams = len(params)
 	prefix = prefix + '_simple_'
 
