@@ -121,12 +121,14 @@ for i, (w, logZ, logZerr, x) in enumerate(zip(weights, f['logZ'].value, f['logZe
 	output_Z[xi, yi] = logZ
 	output_Zerr[xi, yi] = logZerr
 	#x = f['x'][:,i,:]
-	xj = x[j]
+	xequal = x[j,:]
 	for k in range(nparams):
-		v = x[:,k]
+		v = xequal[:,k]
 		output_means[k][xi, yi] = v.mean()
 		output_errs[k][xi, yi] = v.std()
 		print '          param %d (%s) = %.3f +- %.3f' % (k, paramnames[k], v.mean(), v.std())
+	if i < 5:
+		numpy.savetxt(prefix + '.outsamples_%d.txt' % i, xequal)
 	#if i > 1000: break
 
 output_Z = output_Z.reshape((npixx, npixy))
@@ -135,15 +137,31 @@ for pi in range(nparams):
 	output_means[pi] = output_means[pi].reshape((npixx, npixy))
 	output_errs[pi] = output_errs[pi].reshape((npixx, npixy))
 
-filename = sys.argv[1] + '.outimg_%d.hdf5' % ndata
+filename = prefix + '.outimg_%d.hdf5' % ndata
 print 'writing image files ...'
+def makeimg(name, img, title=None):
+	outfilename = prefix + '.outimg_%d_%s.pdf' % (ndata, name)
+	print 'creating %s ...' % outfilename
+	plt.figure()
+	if title is None:
+		title = name
+	plt.title(title)
+	plt.imshow(img, cmap=plt.cm.RdBu)
+	plt.colorbar()
+	plt.savefig(outfilename, bbox_inches='tight')
+	plt.close()
+	
 # store results
 with h5py.File(filename, 'w') as fimg:
 	fimg.create_dataset('logZ', data=output_Z, compression='gzip', shuffle=True)
+	makeimg('logZ', output_Z)
 	fimg.create_dataset('logZerr', data=output_Zerr, compression='gzip', shuffle=True)
+	makeimg('logZerr', output_Zerr)
 	for k in range(nparams):
 		fimg.create_dataset('param%d' % k, data=output_means[k], compression='gzip', shuffle=True)
+		makeimg('param%d' % k, output_means[k], title=paramnames[k])
 		fimg.create_dataset('param%derr' % k, data=output_errs[k], compression='gzip', shuffle=True)
+		makeimg('param%derr' % k, output_errs[k], title=paramnames[k] + ' errors')
 	fimg.attrs['nparams'] = nparams
 
 

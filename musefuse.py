@@ -340,7 +340,7 @@ def priortransform_simple(cube):
 	cube[0] = 10**(cube[0] * 4 - 2) # plateau
 	cube[1] = cube[1] * (sftaus.max() - sftaus.min()) + sftaus.min()
 	cube[2] = cube[2] * (sfages.max() - sfages.min()) + sfages.min()
-	#cube[3] = cube[3] * (zhi - zlo) + zlo # z
+	cube[3] = cube[3] * (zhi - zlo) + zlo # z
 	return cube
 
 # the following is a python-only implementation of the likelihood 
@@ -532,9 +532,8 @@ def multi_loglikelihood_clike(params, data_mask):
 	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
 def multi_loglikelihood_simple_clike(params, data_mask):
-	O, logSFtau, SFage = params
+	O, logSFtau, SFage, z = params
 	Z = 0.012
-	z = zlo
 	EBV = 0
 	params = O, Z, logSFtau, SFage, z, EBV
 	return multi_loglikelihood_clike(params, data_mask)
@@ -581,7 +580,7 @@ if os.environ.get('SIMPLE', '') == 'YES':
 	print('Switching to simple model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
 	priortransform = priortransform_simple
-	params = ['O', 'logSFtau', 'SFage']
+	params = ['O', 'logSFtau', 'SFage', 'z']
 	nparams = len(params)
 	prefix = prefix + '_simple_'
 
