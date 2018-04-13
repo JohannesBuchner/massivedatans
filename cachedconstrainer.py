@@ -10,8 +10,8 @@ def generate_fresh_constrainer():
 		verbose=False)
 
 # use this for Ellipsoidal Sampling, like MultiNest
-#def generate_fresh_constrainer():
-#	return MultiEllipsoidalConstrainer(rebuild_every=1000, enlarge=3.)
+def generate_fresh_constrainer():
+	return MultiEllipsoidalConstrainer(rebuild_every=1000, enlarge=3.)
 
 class CachedConstrainer(object):
 	"""
