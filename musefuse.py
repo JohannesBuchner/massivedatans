@@ -25,7 +25,7 @@ import time
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
 
-do_plotting = True
+do_plotting = False
 
 print 'loading data...'
 f = pyfits.open(sys.argv[1])
