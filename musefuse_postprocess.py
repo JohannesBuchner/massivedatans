@@ -79,10 +79,15 @@ goodids = goodids[:ndata]
 print(y.shape)
 
 prefix = sys.argv[1]
-paramnames = ['O', 'Z', 'logSFtau', 'SFage', 'z', 'EBV']
-if os.environ.get('SIMPLE', '') == 'YES':
-	paramnames = ['O', 'logSFtau', 'SFage', 'z']
-	prefix = prefix + '_simple_'
+model = os.environ.get('MODEL', 'FULL')
+if model == 'ZSOL':
+	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
+	prefix = prefix + '_zsol_'
+elif model == 'FULL'
+	paramnames = ['Z', 'logSFtau', 'SFage', 'z', 'EBV']
+	prefix = prefix + '_full_'
+else:
+	assert False
 
 filename = prefix + '.out_%d.hdf5' % ndata
 f = h5py.File(filename, 'r')

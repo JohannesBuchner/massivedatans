@@ -162,7 +162,7 @@ Definition of the problem
 
 """
 
-params = ['O', 'Z', 'logSFtau', 'SFage', 'z', 'EBV'] #, 'misfit']
+params = ['Z', 'logSFtau', 'SFage', 'z', 'EBV'] #, 'misfit']
 nparams = len(params)
 
 zlo = float(sys.argv[3])
@@ -324,23 +324,24 @@ if True:
 def priortransform(cube):
 	# definition of the parameter width, by transforming from a unit cube
 	cube = cube.copy()
-	cube[0] = 10**(cube[0] * 4 - 2) # plateau
-	cube[1] = cube[1] * (Zs.max() - Zs.min()) + Zs.min()
-	cube[2] = cube[2] * (sftaus.max() - sftaus.min()) + sftaus.min()
-	cube[3] = cube[3] * (sfages.max() - sfages.min()) + sfages.min()
+	#cube[0] = 10**(cube[0] * 4 - 2) # plateau
+	cube[0] = cube[0] * (Zs.max() - Zs.min()) + Zs.min()
+	cube[1] = cube[1] * (sftaus.max() - sftaus.min()) + sftaus.min()
+	cube[2] = cube[2] * (sfages.max() - sfages.min()) + sfages.min()
 	#cube[4] = cube[4] * 3 + 1 # v (km/s)
-	cube[4] = cube[4] * (zhi - zlo) + zlo # z
-	cube[5] = cube[5] * 2 # E(B-V)
+	cube[3] = cube[3] * (zhi - zlo) + zlo # z
+	cube[4] = cube[4] * 2 # E(B-V)
 	#cube[8] = cube[8] * 4 - 1 # misfit
 	return cube
 
 def priortransform_simple(cube):
 	# definition of the parameter width, by transforming from a unit cube
 	cube = cube.copy()
-	cube[0] = 10**(cube[0] * 4 - 2) # plateau
-	cube[1] = cube[1] * (sftaus.max() - sftaus.min()) + sftaus.min()
-	cube[2] = cube[2] * (sfages.max() - sfages.min()) + sfages.min()
-	cube[3] = cube[3] * (zhi - zlo) + zlo # z
+	#cube[0] = 10**(cube[0] * 4 - 2) # plateau
+	cube[0] = cube[0] * (sftaus.max() - sftaus.min()) + sftaus.min()
+	cube[1] = cube[1] * (sfages.max() - sfages.min()) + sfages.min()
+	cube[2] = cube[2] * (zhi - zlo) + zlo # z
+	cube[3] = cube[3] * 2 # E(B-V)
 	return cube
 
 # the following is a python-only implementation of the likelihood 
@@ -517,7 +518,8 @@ lib.like.argtypes = [
 Lout = numpy.zeros(ndata)
 def multi_loglikelihood_clike(params, data_mask):
 	global Lout
-	O, Z, logSFtau, SFage, z, EBV = params
+	#O = 0
+	Z, logSFtau, SFage, z, EBV = params
 	SFtau = 10**logSFtau
 	# predict the model
 	ypred = model(Z, SFtau, SFage, z, EBV)
@@ -525,17 +527,16 @@ def multi_loglikelihood_clike(params, data_mask):
 	if not numpy.any(ypred):
 		# give low probability to solutions with no stars
 		return numpy.ones(data_mask.sum()) * -1e100
-	ypred += O
+	#ypred += O
 	
 	# do everything in C and return the resulting likelihood vector
 	ret = lib.like(y, noise_level, ypred, data_mask, ndata, nspec, Lout)
 	return Lout[data_mask] + numpy.random.normal(0, 1e-5, size=data_mask.sum())
 
 def multi_loglikelihood_simple_clike(params, data_mask):
-	O, logSFtau, SFage, z = params
-	Z = 0.012
-	EBV = 0
-	params = O, Z, logSFtau, SFage, z, EBV
+	logSFtau, SFage, z, EBV = params
+	Z = 0.012 # solar
+	params = Z, logSFtau, SFage, z, EBV
 	return multi_loglikelihood_clike(params, data_mask)
 
 if False:
@@ -576,14 +577,18 @@ multi_loglikelihood = multi_loglikelihood_clike
 
 prefix = sys.argv[1]
 
-if os.environ.get('SIMPLE', '') == 'YES':
-	print('Switching to simple model')
+model = os.environ.get('MODEL', 'FULL')
+if model == 'ZSOL':
+	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
+	prefix = prefix + '_zsol_'
+	print('Switching to Zsol model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
 	priortransform = priortransform_simple
-	params = ['O', 'logSFtau', 'SFage', 'z']
-	nparams = len(params)
-	prefix = prefix + '_simple_'
-
+elif model == 'FULL'
+	prefix = prefix + '_full_'
+	pass
+else:
+	assert False, model
 
 """
 
