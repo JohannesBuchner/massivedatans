@@ -79,11 +79,11 @@ goodids = goodids[:ndata]
 print(y.shape)
 
 prefix = sys.argv[1]
-model = os.environ.get('MODEL', 'FULL')
-if model == 'ZSOL':
+modelname = os.environ.get('MODEL', 'FULL')
+if modelname == 'ZSOL':
 	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
 	prefix = prefix + '_zsol_'
-elif model == 'FULL':
+elif modelname == 'FULL':
 	paramnames = ['Z', 'logSFtau', 'SFage', 'z', 'EBV']
 	prefix = prefix + '_full_'
 else:

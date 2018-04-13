@@ -577,18 +577,18 @@ multi_loglikelihood = multi_loglikelihood_clike
 
 prefix = sys.argv[1]
 
-model = os.environ.get('MODEL', 'FULL')
-if model == 'ZSOL':
+modelname = os.environ.get('MODEL', 'FULL')
+if modelname == 'ZSOL':
 	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
 	prefix = prefix + '_zsol_'
 	print('Switching to Zsol model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
 	priortransform = priortransform_simple
-elif model == 'FULL':
+elif modelname == 'FULL':
 	prefix = prefix + '_full_'
 	pass
 else:
-	assert False, model
+	assert False, modelname
 
 """
 
