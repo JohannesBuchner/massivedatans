@@ -31,10 +31,10 @@ print 'loading data...'
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
-#y = y[:3600,:,:]
+y = y[:3600,:,:]
 nspec, npixx, npixy = y.shape
 noise_level = f['STAT'].data # variance
-#noise_level = noise_level[:3600,:,:]
+noise_level = noise_level[:3600,:,:]
 good = numpy.isfinite(noise_level).all(axis=0)
 print '   %.2f%% good...' % (100*good.mean())
 #print numpy.where(~numpy.isfinite(noise_level[:,40,40]))
@@ -638,7 +638,9 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 superset_constrainer.sampler = sampler
 cc.sampler = sampler
 print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0, max_samples=7000)
+max_samples = int(os.environ.get('MAXSAMPLES', 100000))
+min_samples = int(os.environ.get('MINSAMPLES', 0))
+results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=min_samples, max_samples=max_samples)
 duration = time.time() - start_time
 print 'writing output files ...'
 # store results

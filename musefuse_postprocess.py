@@ -29,7 +29,9 @@ print 'loading data...'
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
+y = y[:3600,:,:]
 noise_level = f['STAT'].data # variance
+noise_level = noise_level[:3600,:,:]
 nspec, npixx, npixy = y.shape
 
 print 'applying subselection ...'
