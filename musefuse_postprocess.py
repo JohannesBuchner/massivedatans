@@ -83,7 +83,7 @@ model = os.environ.get('MODEL', 'FULL')
 if model == 'ZSOL':
 	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
 	prefix = prefix + '_zsol_'
-elif model == 'FULL'
+elif model == 'FULL':
 	paramnames = ['Z', 'logSFtau', 'SFage', 'z', 'EBV']
 	prefix = prefix + '_full_'
 else:

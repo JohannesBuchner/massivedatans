@@ -584,7 +584,7 @@ if model == 'ZSOL':
 	print('Switching to Zsol model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
 	priortransform = priortransform_simple
-elif model == 'FULL'
+elif model == 'FULL':
 	prefix = prefix + '_full_'
 	pass
 else:
