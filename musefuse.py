@@ -162,8 +162,8 @@ Definition of the problem
 
 """
 
-params = ['Z', 'logSFtau', 'SFage', 'z', 'EBV'] #, 'misfit']
-nparams = len(params)
+paramnames = ['Z', 'logSFtau', 'SFage', 'z', 'EBV'] #, 'misfit']
+nparams = len(paramnames)
 
 zlo = float(sys.argv[3])
 zhi = float(sys.argv[4])
@@ -580,6 +580,7 @@ prefix = sys.argv[1]
 modelname = os.environ.get('MODEL', 'FULL')
 if modelname == 'ZSOL':
 	paramnames = ['logSFtau', 'SFage', 'z', 'EBV']
+	nparams = len(paramnames)
 	prefix = prefix + '_zsol_'
 	print('Switching to Zsol model')
 	multi_loglikelihood = multi_loglikelihood_simple_clike
