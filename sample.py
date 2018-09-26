@@ -192,7 +192,7 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 superset_constrainer.sampler = sampler
 cc.sampler = sampler
 print('integrating ...')
-max_samples = int(os.environ.get('MAXSAMPLES', 1000))
+max_samples = int(os.environ.get('MAXSAMPLES', 0))
 min_samples = int(os.environ.get('MINSAMPLES', 0))
 results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=min_samples, max_samples=max_samples)
 duration = time.time() - start_time
