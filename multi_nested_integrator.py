@@ -85,7 +85,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 	
 	widgets = ["|...|",
 		progressbar.Bar(), progressbar.Percentage(), AdaptiveETA()]
-	pbar = progressbar.ProgressBar(widgets = widgets)
+	pbar = progressbar.ProgressBar(widgets = widgets, maxval=sampler.nlive_points)
 	
 	i = 0
 	ndata = multi_sampler.ndata
@@ -101,7 +101,6 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 	H = Li - logZ
 	remainder_tails = [[]] * ndata
 	pbar.currval = i
-	pbar.max_value = sampler.nlive_points
 	pbar.start()
 	while True:
 		i = i + 1
@@ -128,7 +127,11 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 		# expected number of iterations:
 		i_final = -sampler.nlive_points * (-sampler.Lmax + log(exp(numpy.max([tolerance - logZerr[running], logZerr[running] / 100.], axis=0) + logZ[running]) - exp(logZ[running])))
 		i_final = numpy.where(i_final < i+1, i+1, numpy.where(i_final > i+100000, i+100000, i_final))
-		pbar.max_value = max(i+1, i_final.max())
+		max_value = max(i+1, i_final.max())
+		if hasattr(pbar, 'max_value'):
+			pbar.max_value = max_value
+		elif hasattr(pbar, 'maxval'):
+			pbar.maxval = max_value
 		
 		if i > min_samples and i % 50 == 1 or (max_samples and i > max_samples):
 			remainderZ, remainderZerr, totalZ, totalZerr, totalZerr_bootstrapped = integrate_remainder(sampler, logwidth, logVolremaining, logZ[running], H[running], sampler.Lmax)
@@ -140,7 +143,7 @@ def multi_nested_integrator(multi_sampler, tolerance = 0.01, max_samples=None, m
 			if max_samples and i > max_samples:
 				terminating[:] = True
 			widgets[0] = '|%d/%d samples+%d/%d|lnZ = %.2f +- %.3f + %.3f|L=%.2f^%.2f ' % (
-				i + 1, pbar.max_value, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
+				i + 1, max_value, sampler.nlive_points, sampler.ndraws, logaddexp(logZ[running][0], remainderZ[0]), max(logZerr[running]), max(remainderZerr), Li[0], sampler.Lmax[0])
 			if terminating.any():
 				print('terminating %d, namely:' % terminating.sum(), list(numpy.where(terminating)[0]))
 				for j, k in enumerate(numpy.where(running)[0]):

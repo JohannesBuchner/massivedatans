@@ -561,6 +561,8 @@ class MultiNestedSampler(object):
 				yield u, x, L
 				#yield self.live_pointsu[i,d], self.live_pointsx[i,d], self.live_pointsL[i,d]
 	
+	next = __next__
+	
 	def __iter__(self):
 		while True: yield self.__next__()
 		
