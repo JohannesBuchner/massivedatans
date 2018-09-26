@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import matplotlib.pyplot as plt
 import h5py
@@ -18,7 +19,7 @@ N = int(sys.argv[1])
 numpy.random.seed(N)
 z = arctan(numpy.random.uniform(-pi, pi, size=N)) * 0.1
 rest_wave = 656
-print 'generating parameters ...'
+print('generating parameters ...')
 width_narrow = 5.0 * numpy.ones(N)
 mean_narrow = rest_wave * (1 + z)
 width_narrow = width_narrow
@@ -26,18 +27,18 @@ noise_level = 0.01
 signal_level = 0.02 / numpy.random.power(3, size=N)
 height_narrow = signal_level
 
-print 'generating signal ...'
+print('generating signal ...')
 ym = gauss(A=height_narrow, mu=mean_narrow, x=x, sig=width_narrow)
 ym = numpy.transpose(ym)
-print ym.shape
+print(ym.shape)
 
 # add noise
-print 'adding noise...'
+print('adding noise...')
 y = ym.copy()
 for i in range(N):
 	y[:,i] += numpy.random.normal(0, noise_level, size=len(x))
 
-print 'plotting ...'
+print('plotting ...')
 #for i in range(min(N, 20)):
 #	#plt.plot(x, y[:,i], '.-')
 #	plt.plot(x, y[:,i], '-')

@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import json
 import numpy
 from numpy import log, log10, arctan, pi, exp
@@ -11,7 +12,7 @@ filename = sys.argv[1]
 with h5py.File(filename, 'r') as f:
 	logZ = f['logZ'].value
 	for i in range(len(logZ)):
-		print '   %d ...' % i
+		print('   %d ...' % i)
 		w = f['w'][:,i] + f['L'][:,i]
 		mask = numpy.isfinite(w)
 		if mask.sum() < 4000:
@@ -28,7 +29,7 @@ with h5py.File(filename, 'r') as f:
 		SFtau = f['x'][:,i,2][j]
 		SFage = numpy.log10(f['x'][:,i,3][j])
 		EBV = f['x'][:,i,4][j]
-		print w.shape, O.shape, Z.shape, SFtau.shape, SFage.shape, EBV.shape
+		print(w.shape, O.shape, Z.shape, SFtau.shape, SFage.shape, EBV.shape)
 		data = numpy.transpose([O, Z, SFtau, SFage, EBV])
 		
 		# make marginal plots

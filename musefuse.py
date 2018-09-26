@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Main program
@@ -27,7 +28,7 @@ import matplotlib.pyplot as plt
 
 do_plotting = False
 
-print 'loading data...'
+print('loading data...')
 f = pyfits.open(sys.argv[1])
 datasection = f['DATA'] 
 y = datasection.data # values
@@ -36,12 +37,12 @@ nspec, npixx, npixy = y.shape
 noise_level = f['STAT'].data # variance
 noise_level = noise_level[:3600,:,:]
 good = numpy.isfinite(noise_level).all(axis=0)
-print '   %.2f%% good...' % (100*good.mean())
+print('   %.2f%% good...' % (100*good.mean()))
 #print numpy.where(~numpy.isfinite(noise_level[:,40,40]))
 #print noise_level[~numpy.isfinite(noise_level[:,40,40]),40,40]
 
 if do_plotting:
-	print 'plotting image...'
+	print('plotting image...')
 	plt.figure(figsize=(20,20))
 	plt.imshow(y[0,:,:])
 	plt.savefig('musefuse_img0.png', bbox_inches='tight')
@@ -58,38 +59,38 @@ i = numpy.where(maskx)[0]
 ilo, ihi = i.min(), i.max() + 1
 j = numpy.where(masky)[0]
 jlo, jhi = j.min(), j.max() + 1
-print(mask.sum(), ilo, ihi, jlo, jhi, y.shape, npixx, npixy)
+print((mask.sum(), ilo, ihi, jlo, jhi, y.shape, npixx, npixy))
 #ndata = mask.sum()
 
 #ymask = mask.reshape((1, npixx, npixy))
 ymask = numpy.array([mask] * len(y))
 y[~ymask] = numpy.nan
 if do_plotting:
-	print 'plotting selection ...'
+	print('plotting selection ...')
 	plt.figure(figsize=(20,20))
 	plt.imshow(y[0,ilo:ihi,jlo:jhi])
 	plt.colorbar()
 	plt.savefig('musefuse_sel_img0.png', bbox_inches='tight')
 	plt.close()
 
-print 'applying subselection ...'
+print('applying subselection ...')
 y = y[ymask]
 noise_level = noise_level[ymask]
-print '    subselection gave %s ...' % (y.shape)
+print('    subselection gave %s ...' % (y.shape))
 y = y.reshape((nspec, -1))
 noise_level = noise_level.reshape((nspec, -1))
 x = datasection.header['CD3_3'] * numpy.arange(nspec) + datasection.header['CRVAL3']
 wavelength = x
 #good = numpy.logical_and(numpy.isfinite(noise_level).all(axis=0), numpy.isfinite(y).all(axis=0))
-print '    finding NaNs...'
+print('    finding NaNs...')
 good = numpy.isfinite(noise_level).all(axis=0)
-print '    found %d finite spaxels ...' % (good.sum())
+print('    found %d finite spaxels ...' % (good.sum()))
 #assert good.shape == (ymask.sum(),), good.shape
 goodids = numpy.where(good)[0]
 #numpy.random.shuffle(goodids)
 
 ndata = int(os.environ.get('MAXDATA', len(goodids)))
-print '    truncating data to %d sets...' % ndata, goodids[:ndata]
+print('    truncating data to %d sets...' % ndata, goodids[:ndata])
 ## truncate data
 y = y[:,goodids[:ndata]]
 noise_level = noise_level[:,goodids[:ndata]]
@@ -102,7 +103,7 @@ assert ndata > 0, 'No valid data!?'
 
 #noise_level[noise_level > 2 * numpy.median(vd[:,i]] = 1000
 
-print '    cleaning data'
+print('    cleaning data')
 noise_level2 = noise_level.copy()
 w = 10
 for j in range(nspec):
@@ -120,7 +121,7 @@ for j in range(nspec):
 	v = (diff > 5 * meddiff) * 1e10
 	#k = j
 	if False and v.any():
-		print '    updating noise level at', j #, meddiff, diff
+		print('    updating noise level at', j) #, meddiff, diff
 		for k in range(max(0, j-3), min(nspec-1, j+3)+1):
 			noise_level2[k,:] += v
 
@@ -171,7 +172,7 @@ filenames = sys.argv[5:]
 grid = []
 
 for iZ, filename in enumerate(filenames):
-	print filename
+	print(filename)
 	data = numpy.loadtxt(filename)
 	model_wavelength = data[:,0]
 	model_templates = data[:,1:].transpose()
@@ -383,7 +384,7 @@ def multi_loglikelihood(params, data_mask):
 		j = numpy.where(data_mask)[0][i]
 		if L[i] > Lmax[j]:
 			Lmax[j] = L[i]
-			print 'plotting...'
+			print('plotting...')
 			plt.figure(figsize=(20,20))
 			plt.subplot(3, 1, 1)
 			plt.title(str(params) + ' : chi2:' + str(chi2))
@@ -438,7 +439,7 @@ def multi_loglikelihood_vectorized(params, data_mask):
 		if not (L[j] > Lmax[i]): continue
 		Lmax[i] = L[j]
 		if i % (1 + ndata // 3) != 0: continue
-		print 'updating bestfit plot of %d ... chi2: %.2f' % (i+1, chi2[j])
+		print('updating bestfit plot of %d ... chi2: %.2f' % (i+1, chi2[j]))
 		#print '   ', yd.shape, yd[:,j].shape, ypred.shape
 		plt.figure(figsize=(20,20))
 		plt.subplot(3, 1, 1)
@@ -535,13 +536,14 @@ def multi_loglikelihood_clike(params, data_mask):
 
 def multi_loglikelihood_simple_clike(params, data_mask):
 	logSFtau, SFage, z, EBV = params
-	Z = 0.012 # solar
+	#Z = 0.012 # solar
+	Z = 0.004 # Patricio2018
 	params = Z, logSFtau, SFage, z, EBV
 	return multi_loglikelihood_clike(params, data_mask)
 
 if False:
 	data_mask_all = numpy.ones(ndata) == 1
-	print 'testing vectorised code...'
+	print('testing vectorised code...')
 	for i in range(100):
 		cube = numpy.random.uniform(size=nparams)
 		params = priortransform(cube)
@@ -557,19 +559,19 @@ if False:
 	test_cubes = [priortransform(numpy.random.uniform(size=nparams)) for i in range(1000)]
 	a = time.time()
 	[multi_loglikelihood(cube, data_mask_all) for cube in test_cubes]
-	print 'original python code:', time.time() - a
+	print('original python code:', time.time() - a)
 	a = time.time()
 	[multi_loglikelihood_vectorized(cube, data_mask_all) for cube in test_cubes]
-	print 'vectorised python code:', time.time() - a
+	print('vectorised python code:', time.time() - a)
 	a = time.time()
 	[multi_loglikelihood_vectorized_short(cube, data_mask_all) for cube in test_cubes]
-	print 'shortened vectorised python code:', time.time() - a
+	print('shortened vectorised python code:', time.time() - a)
 	a = time.time()
 	[multi_loglikelihood_numexpr(cube, data_mask_all) for cube in test_cubes]
-	print 'numexpr code:', time.time() - a
+	print('numexpr code:', time.time() - a)
 	a = time.time()
 	[multi_loglikelihood_clike(cube, data_mask_all) for cube in test_cubes]
-	print 'C code:', time.time() - a
+	print('C code:', time.time() - a)
 
 #multi_loglikelihood = multi_loglikelihood_vectorized_short
 #multi_loglikelihood = multi_loglikelihood_numexpr
@@ -613,7 +615,7 @@ focusset_constrainer = cc.get
 _, _, individual_draw_constrained = generate_individual_constrainer()
 numpy.random.seed(1)
 start_time = time.time()
-print 'setting up integrator ...'
+print('setting up integrator ...')
 nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
 
 # constrained region draw functions
@@ -643,17 +645,17 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 
 superset_constrainer.sampler = sampler
 cc.sampler = sampler
-print 'integrating ...'
+print('integrating ...')
 max_samples = int(os.environ.get('MAXSAMPLES', 100000))
 min_samples = int(os.environ.get('MINSAMPLES', 0))
 results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=min_samples, max_samples=max_samples)
 duration = time.time() - start_time
-print 'writing output files ...'
+print('writing output files ...')
 # store results
 with h5py.File(prefix + '.out_%d.hdf5' % ndata, 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
-	u, x, L, w, mask = zip(*results['weights'])
+	u, x, L, w, mask = list(zip(*results['weights']))
 	f.create_dataset('u', data=u, compression='gzip', shuffle=True)
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('L', data=L, compression='gzip', shuffle=True)
@@ -664,12 +666,12 @@ with h5py.File(prefix + '.out_%d.hdf5' % ndata, 'w') as f:
 	f.create_dataset('duration', data=duration)
 	f.create_dataset('ndata', data=ndata)
 	
-	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
-	print 'ndraws:', sampler.ndraws, 'niter:', len(w)
+	print('logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0]))
+	print('ndraws:', sampler.ndraws, 'niter:', len(w))
 
-print 'writing statistic ...'
+print('writing statistic ...')
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
 	open(prefix + '.out_%d.stats.json' % ndata, 'w'), indent=4)
-print 'done.'
+print('done.')
 
 

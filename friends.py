@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import scipy.spatial, scipy.cluster
 import matplotlib.pyplot as plt
@@ -62,7 +63,7 @@ class FriendsConstrainer(object):
 		"""
 		
 		"""
-		if self.verbose: print 'building region ...'
+		if self.verbose: print('building region ...')
 		if len(u) > 10:
 			if keepRadius and self.region is not None and 'maxdistance' in self.region:
 				maxdistance = self.region['maxdistance']
@@ -79,7 +80,7 @@ class FriendsConstrainer(object):
 				maxdistance = min(maxdistance, self.region['maxdistance'])
 			if self.keep_phantom_points and len(self.phantom_points) > 0:
 				# add phantoms to u now
-				print 'including phantom points in cluster members', self.phantom_points
+				print('including phantom points in cluster members', self.phantom_points)
 				u = numpy.vstack((u, self.phantom_points))
 			ulow  = numpy.max([u.min(axis=0) - maxdistance, numpy.zeros(ndim)], axis=0)
 			uhigh = numpy.min([u.max(axis=0) + maxdistance, numpy.ones(ndim)], axis=0)
@@ -87,7 +88,7 @@ class FriendsConstrainer(object):
 			maxdistance = None
 			ulow = numpy.zeros(ndim)
 			uhigh = numpy.ones(ndim)
-		if self.verbose: print 'setting sampling region:', (ulow, uhigh), maxdistance
+		if self.verbose: print('setting sampling region:', (ulow, uhigh), maxdistance)
 		self.region = dict(members=u, maxdistance=maxdistance, ulow=ulow, uhigh=uhigh)
 		self.generator = None
 		
@@ -193,12 +194,12 @@ class FriendsConstrainer(object):
 				# draw from points
 				us = members[numpy.random.randint(0, len(members), 100),:]
 				ntotal += 100
-				if verbose: print 'chosen point', us
+				if verbose: print('chosen point', us)
 				if self.metric == 'euclidean':
 					# draw direction around it
 					direction = numpy.random.normal(0, 1, size=(100, ndim))
 					direction = direction / ((direction**2).sum(axis=1)**0.5).reshape((-1,1))
-					if verbose: print 'chosen direction', direction
+					if verbose: print('chosen direction', direction)
 					# choose radius: volume gets larger towards the outside
 					# so give the correct weight with dimensionality
 					radius = maxdistance * numpy.random.uniform(0, 1, size=(100,1))**(1./ndim)
@@ -206,24 +207,24 @@ class FriendsConstrainer(object):
 				else:
 					assert self.metric == 'chebyshev'
 					us = us + numpy.random.uniform(-maxdistance, maxdistance, size=(100, ndim))
-				if verbose: print 'using point', u
+				if verbose: print('using point', u)
 				inside = numpy.logical_and((us >= 0).all(axis=1), (us <= 1).all(axis=1))
 				if not inside.any():
-					if verbose: print 'outside boundaries', us, direction, maxdistance
+					if verbose: print('outside boundaries', us, direction, maxdistance)
 					continue
 				us = us[inside]
 				# count the number of points this is close to
 				dists = scipy.spatial.distance.cdist(members, us, metric=self.metric)
 				assert dists.shape == (len(members), len(us))
 				nnear = (dists < maxdistance).sum(axis=0)
-				if verbose: print 'near', nnear
+				if verbose: print('near', nnear)
 				#ntotal += 1
 				# accept with probability 1./nnear
 				coin = numpy.random.uniform(size=len(us))
 				
 				accept = coin < 1. / nnear
 				if not accept.any():
-					if verbose: print 'probabilistic rejection due to overlaps'
+					if verbose: print('probabilistic rejection due to overlaps')
 					continue
 				us = us[accept]
 				for u in us:
@@ -258,7 +259,7 @@ class FriendsConstrainer(object):
 			self.file.write("{} {} {}\n".format(self.iter, self.region['maxdistance'], len(self.region['members'])))
 		self.file.write("{} {} {} {}\n".format(self.iter, self.region['maxdistance'], len(self.region['members']), ndim))
 	def debugplot(self, u = None):
-		print 'creating plot...'
+		print('creating plot...')
 		n = len(self.region['members'][0]) / 2
 		plt.figure(figsize=(6, n/2*4+1))
 		m = self.region['members']
@@ -275,7 +276,7 @@ class FriendsConstrainer(object):
 		prefix='friends%s-%s_' % ('1' if self.jackknife else '', self.metric)
 		plt.savefig(prefix + 'cluster.pdf')
 		plt.close()
-		print 'creating plot... done'
+		print('creating plot... done')
 	
 	def draw_constrained(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, max_draws=None, **kwargs):
 		# previous is [[u, x, L], ...]
@@ -320,7 +321,7 @@ class FriendsConstrainer(object):
 					# yay, we win
 					if ntotalsum > 10000: 
 						if self.verbose: 
-							print 'sampled %d points, evaluated %d ' % (ntotalsum, ntoaccept)
+							print('sampled %d points, evaluated %d ' % (ntotalsum, ntoaccept))
 							#self.debugplot(u)
 					return u, x, L, ntoaccept
 				
@@ -398,7 +399,7 @@ if __name__ == '__main__':
 		u, x, L, ntoaccept = friends.draw_constrained(Lmin, priortransform, loglikelihood, previous, ndim)
 		r = ((x[0] - 0.5)**2 + (x[1] - 0.5)**2)**0.5
 		taken.append(r)
-		print 'suggested:', u
+		print('suggested:', u)
 	plt.subplot(1, 2, 2)
 	plt.hist(taken, cumulative=True, normed=True, 
 			color='g', bins=1000, histtype='step')

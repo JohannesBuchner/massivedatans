@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Main program
@@ -23,7 +24,7 @@ import json
 import os
 import time
 
-print 'loading data...'
+print('loading data...')
 ndata = int(sys.argv[2])
 with h5py.File(sys.argv[1], 'r') as f:
 	x = numpy.array(f['x'].value)
@@ -123,11 +124,38 @@ We start with the latter.
 
 from multi_nested_integrator import multi_nested_integrator
 from multi_nested_sampler import MultiNestedSampler
-from hiermetriclearn import MetricLearningFriendsConstrainer
 
+import cachedconstrainer
+from cachedconstrainer import CachedConstrainer, generate_individual_constrainer, generate_superset_constrainer, MultiEllipsoidalConstrainer, MetricLearningFriendsConstrainer, generate_fresh_constrainer
+
+constrainer_type = os.environ.get('CONSTRAINER', 'MLFRIENDS')
+if constrainer_type == 'MLFRIENDS':
+	def generate_fresh_constrainer():
+		return MetricLearningFriendsConstrainer(
+			metriclearner = 'truncatedscaling', force_shrink=True,
+			rebuild_every=1000, metric_rebuild_every=20, 
+			verbose=False)
+
+	superset_constrainer = MetricLearningFriendsConstrainer(
+			metriclearner = 'truncatedscaling', force_shrink=True,
+			rebuild_every=1000, metric_rebuild_every=20, 
+			verbose=False)
+elif constrainer_type == 'MULTIELLIPSOIDS':
+	def generate_fresh_constrainer():
+		return MultiEllipsoidalConstrainer(rebuild_every=1000)
+
+	superset_constrainer = MultiEllipsoidalConstrainer(rebuild_every=1000)
+else:
+	assert False, constrainer_type
+
+cachedconstrainer.generate_fresh_constrainer = generate_fresh_constrainer
+
+cc = CachedConstrainer()
+focusset_constrainer = cc.get
+_, _, individual_draw_constrained = generate_individual_constrainer()
 numpy.random.seed(1)
 start_time = time.time()
-print 'setting up integrator ...'
+print('setting up integrator ...')
 nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
 
 # constrained region draw functions
@@ -142,95 +170,6 @@ nlive_points = int(os.environ.get('NLIVE_POINTS','400'))
 #   leading potentially to slightly more rejections. 
 # However, there is substantial execution speedup.
 
-superset_constrainer = MetricLearningFriendsConstrainer(metriclearner = 'truncatedscaling', 
-	rebuild_every=1000, metric_rebuild_every=20, verbose=False, force_shrink=True)
-class CachedConstrainer(object):
-	"""
-	This keeps metric learners if they are used (in the last three iterations).
-	Otherwise, constructs a fresh one.
-	"""
-	def __init__(self):
-		self.iter = 0
-		self.prev_prev_prev_generation = {}
-		self.prev_prev_generation = {}
-		self.prev_generation = {}
-		self.curr_generation = {}
-		self.last_mask = []
-		self.last_points = []
-		self.last_realmask = None
-	
-	def get(self, mask, realmask, points, it):
-		while self.iter < it:
-			# new generation
-			self.prev_prev_prev_generation = self.prev_prev_generation
-			self.prev_prev_generation = self.prev_generation
-			self.prev_generation = self.curr_generation
-			self.curr_generation = {}
-			self.last_mask = []
-			self.last_realmask = None
-			self.last_points = []
-			self.iter += 1
-		
-		# if we only dropped a single (or a few) data sets
-		# compared to the call just before, lets reuse the same
-		# this happens in the focussed draw with 1000s of data sets
-		# where a single data set can accept a point; 
-		# not worth to recompute the region.
-		if self.last_realmask is not None and len(mask) < len(self.last_mask) and \
-			len(mask) > 0.80 * len(self.last_mask) and \
-			len(points) <= len(self.last_points) and \
-			len(points) > 0.90 * len(self.last_points) and \
-			numpy.mean(self.last_realmask == realmask) > 0.80 and \
-			numpy.in1d(points, self.last_points).all():
-			print 're-using previous, similar region (%.1f%% data set overlap, %.1f%% points overlap)' % (numpy.mean(self.last_realmask == realmask) * 100., len(points) * 100. / len(self.last_points), )
-			k = tuple(self.last_mask.tolist())
-			return self.curr_generation[k].draw_constrained
-		print 'not re-using region', (len(mask), len(self.last_mask), len(points), len(self.last_points), (len(mask) < len(self.last_mask), len(mask) > 0.80 * len(self.last_mask), len(points) > 0.90 * len(self.last_points), numpy.mean(self.last_realmask == realmask) ) )
-		
-		# normal operation:
-		k = tuple(mask.tolist())
-		self.last_realmask = realmask
-		self.last_mask = mask
-		self.last_points = points
-		
-		# try to recycle
-		if k in self.curr_generation:
-			pass
-		elif k in self.prev_generation:
-			print 're-using previous1 region'
-			self.curr_generation[k] = self.prev_generation[k]
-		elif k in self.prev_prev_generation:
-			print 're-using previous2 region'
-			self.curr_generation[k] = self.prev_prev_generation[k]
-		elif k in self.prev_prev_prev_generation:
-			print 're-using previous3 region'
-			self.curr_generation[k] = self.prev_prev_prev_generation[k]
-		else:
-			# nothing found, so start from scratch
-			self.curr_generation[k] = MetricLearningFriendsConstrainer(
-				metriclearner = 'truncatedscaling', force_shrink=True,
-				rebuild_every=1000, metric_rebuild_every=20, 
-				verbose=False)
-			self.curr_generation[k].sampler = sampler
-		
-		return self.curr_generation[k].draw_constrained
-
-focusset_constrainer = CachedConstrainer().get
-individual_constrainers = {}
-individual_constrainers_lastiter = {}
-def individual_draw_constrained(i, it):
-	if i not in individual_constrainers:
-		individual_constrainers[i] = MetricLearningFriendsConstrainer(
-			metriclearner = 'truncatedscaling', force_shrink=True,
-			rebuild_every=1000, metric_rebuild_every=20, 
-			verbose=False)
-		individual_constrainers[i].sampler = sampler
-		individual_constrainers_lastiter[i] = it
-	if it > individual_constrainers_lastiter[i] + 5:
-		# force rebuild
-		individual_constrainers[i].region = None
-	individual_constrainers_lastiter[i] = it
-	return individual_constrainers[i].draw_constrained
 
 # now set up sampler and pass the three constrainers
 
@@ -242,29 +181,34 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 	draw_constrained = focusset_constrainer, 
 	nsuperset_draws = int(os.environ.get('SUPERSET_DRAWS', '10')),
 	use_graph = os.environ.get('USE_GRAPH', '1') == '1'
-	)
+)
+
 superset_constrainer.sampler = sampler
-print 'integrating ...'
-results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=0) #, max_samples=1000)
+cc.sampler = sampler
+print('integrating ...')
+max_samples = int(os.environ.get('MAXSAMPLES', 1000))
+min_samples = int(os.environ.get('MINSAMPLES', 0))
+results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=min_samples, max_samples=max_samples)
 duration = time.time() - start_time
-print 'writing output files ...'
+print('writing output files ...')
+prefix = '%s_%s_nlive%d' % (sys.argv[1], constrainer_type, nlive_points)
 # store results
-with h5py.File(sys.argv[1] + '.out7.hdf5', 'w') as f:
+with h5py.File(prefix + '.out8.hdf5', 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
-	u, x, L, w, mask = zip(*results['weights'])
+	u, x, L, w, mask = list(zip(*results['weights']))
 	f.create_dataset('u', data=u, compression='gzip', shuffle=True)
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('L', data=L, compression='gzip', shuffle=True)
 	f.create_dataset('w', data=w, compression='gzip', shuffle=True)
 	f.create_dataset('mask', data=mask, compression='gzip', shuffle=True)
 	f.create_dataset('ndraws', data=sampler.ndraws)
-	print 'logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0])
-	print 'ndraws:', sampler.ndraws, 'niter:', len(w)
+	print('logZ = %.1f +- %.1f' % (results['logZ'][0], results['logZerr'][0]))
+	print('ndraws:', sampler.ndraws, 'niter:', len(w))
 
-print 'writing statistic ...'
+print('writing statistic ...')
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(sys.argv[1] + '_%d.out7.stats.json' % ndata, 'w'), indent=4)
-print 'done.'
+	open(prefix + '_%d.out8.stats.json' % ndata, 'w'), indent=4)
+print('done.')
 
 

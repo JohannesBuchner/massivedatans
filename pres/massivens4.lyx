@@ -2196,7 +2196,20 @@ Even in the analysis of single objects the presented algorithm can help.
  Large Monte Carlo simulations of a null hypothesis model can be quickly
  analysed with the presented method, with a model evaluation cost that is
  essentially independent of the number of generated data sets.
- Going further, approaches to validate models and Bayesian inference (e.g.,
+ 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+r{
+\end_layout
+
+\end_inset
+
+Going further, approaches to validate models and Bayesian inference (e.g.,
  
 \begin_inset CommandInset citation
 LatexCommand cite
@@ -2205,6 +2218,17 @@ key "Talts2018"
 \end_inset
 
 ) over the entire parameter space can be sped up.
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+}
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section*

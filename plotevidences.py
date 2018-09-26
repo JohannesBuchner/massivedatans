@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import json
 import numpy
 from numpy import log, log10
@@ -30,10 +31,10 @@ logZ1 = f['logZ'].value
 B = numpy.log10(numpy.exp(logZ1 - logZ0))
 Blim = sorted(B)[int(len(B)*0.999)]
 Blim = B.max()
-print 10**Blim
+print(10**Blim)
 bins = numpy.linspace(-5, 5, 100)
 plt.hist(B, bins=bins, color='r', histtype='step', normed=True)
-x = range(-1, 5)
+x = list(range(-1, 5))
 plt.vlines(Blim, 0, 4, color='green', linestyles=[':'])
 plt.ylim(0, 4)
 plt.yticks([0, 1, 2, 3, 4])

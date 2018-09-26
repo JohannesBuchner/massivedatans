@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Implementation of MultiEllipsoidal sampling via nestle
@@ -64,7 +65,7 @@ class MultiEllipsoidalConstrainer(object):
 	def _draw_constrained_prepare(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs):
 		rebuild = self.ndraws_since_rebuild > self.rebuild_every or self.ells is None
 		if rebuild:
-			print 'rebuild triggered at call'
+			print('rebuild triggered at call')
 			self.rebuild(numpy.asarray(live_pointsu), ndim)
 			self.ndraws_since_rebuild = 0
 		assert self.generator is not None
@@ -94,7 +95,7 @@ class MultiEllipsoidalConstrainer(object):
 				#     if we haven't done so at the start
 				if not rebuild and self.ndraws_since_rebuild > self.rebuild_every:
 					rebuild = True
-					print 'Ellipsoid rebuild triggered after %d draws' % self.ndraws_since_rebuild
+					print('Ellipsoid rebuild triggered after %d draws' % self.ndraws_since_rebuild)
 					self.rebuild(numpy.asarray(live_pointsu), ndim)
 					self.ndraws_since_rebuild = 0
 					break
