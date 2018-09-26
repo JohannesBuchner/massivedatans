@@ -229,14 +229,51 @@ class FilteredUnitRandomSliceProposal(FilteredUnitHARMProposal):
 	def __repr__(self):
 		return 'FilteredUnitRandomSliceProposal(scale=%s, adapt=%s)' % (self.scale, self.adapt)
 
+class FilteredUnitIterateSliceProposal(FilteredUnitHARMProposal):
+	"""
+	Unit Slice sampling proposal, iterative component-wise.
+
+	@see BaseProposal
+	"""
+	def __init__(self, adapt = False, scale = 1.):
+		BaseProposal.__init__(self, adapt=False, scale=float(scale))
+		self.curindex = 0
+	
+	def generate_direction(self, u, ndim, points):
+		# choose next base vector
+		d = numpy.zeros(ndim)
+		self.curindex = (self.curindex + 1) % ndim
+		d[self.curindex] = 1
+		return d
+	def __repr__(self):
+		return 'FilteredUnitIterateSliceProposal(scale=%s, adapt=%s)' % (self.scale, self.adapt)
+
+class FilteredUnitRandomSliceProposal(FilteredUnitHARMProposal):
+	"""
+	Unit Slice sampling proposal, random component-wise.
+
+	@see BaseProposal
+	"""
+	def generate_direction(self, u, ndim, points):
+		# choose a random base vector
+		d = numpy.zeros(ndim)
+		i = numpy.random.randint(ndim)
+		d[i] = 1
+		return d
+	def __repr__(self):
+		return 'FilteredUnitRandomSliceProposal(scale=%s, adapt=%s)' % (self.scale, self.adapt)
+
 class SliceConstrainer(object):
 	"""
 	Markov chain Monte Carlo proposals using the Metropolis update: 
 	Do a number of steps, while adhering to boundary.
 	"""
-	def __init__(self, proposer = MultiScaleProposal(), nmaxsteps = 10000):
+	def __init__(self, proposer = MultiScaleProposal(), nsteps = 10, nmaxsteps = 10000):
 		self.proposer = proposer
 		self.sampler = None
+		# number of new directions
+		self.nsteps = nsteps
+		# number of narrowings
 		self.nmaxsteps = nmaxsteps
 	
 	def draw_constrained(self, Lmins, priortransform, loglikelihood, ndim, 
@@ -245,14 +282,14 @@ class SliceConstrainer(object):
 		ui = live_pointsu[i]
 		xi = None
 		naccepts = 0
-		for i in range(self.nmaxsteps):
+		# new direction
+		for i in range(self.nsteps):
 			self.proposer.new_chain(ui, ndim, live_pointsu, is_inside_unit_filter)
-			n = 0
-			while True:
+			# narrow in until we get an accept
+			for n in range(self.nmaxsteps):
 				u = self.proposer.propose(ui, ndim, live_pointsu, is_inside_unit_filter)
 				x = priortransform(u)
 				L = loglikelihood(x)
-				n = n + 1
 				# MH accept rule
 				# accept = L > Li or numpy.random.uniform() < exp(L - Li)
 				# Likelihood-difference independent, because we do
@@ -271,7 +308,6 @@ class SliceConstrainer(object):
 					ui, xi, Li = u, x, L
 					naccepts += 1
 					break
-				assert n < self.nmaxsteps, n
 		if numpy.all(Li < Lmins):
 			print()
 			print('ERROR: SliceConstrainer could not find a point matching constraint!')

@@ -147,9 +147,9 @@ elif constrainer_type == 'MULTIELLIPSOIDS':
 	superset_constrainer = generate_fresh_constrainer()
 elif constrainer_type == 'SLICE':
 	#from whitenedmcmc import FilteredMCMCConstrainer, HybridMLMultiEllipsoidConstrainer
-	from whitenedmcmc import SliceConstrainer, FilteredMahalanobisHARMProposal
+	from whitenedmcmc import SliceConstrainer, FilteredMahalanobisHARMProposal, FilteredUnitIterateSliceProposal
 	def generate_fresh_constrainer():
-		return SliceConstrainer(proposer=FilteredMahalanobisHARMProposal(), nmaxsteps=10)
+		return SliceConstrainer(proposer=FilteredUnitIterateSliceProposal(), nsteps=nparams*10)
 	superset_constrainer = generate_fresh_constrainer()
 else:
 	assert False, constrainer_type
