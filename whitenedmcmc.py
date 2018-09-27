@@ -179,7 +179,7 @@ class FilteredUnitHARMProposal(BaseProposal):
 			#print('slice range:', (self.backward_scale, self.forward_scale))
 			x = numpy.random.uniform(self.backward_scale, self.forward_scale)
 			p = u + self.direction * x
-			assert self.forward_scale - self.backward_scale > 1e-100
+			#assert self.forward_scale - self.backward_scale > 1e-100
 			if x < 0:
 				self.backward_scale = x
 			else:
