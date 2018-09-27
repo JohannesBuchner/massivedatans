@@ -282,6 +282,7 @@ class SliceConstrainer(object):
 		ui = live_pointsu[i]
 		xi = None
 		naccepts = 0
+		nevals = 0
 		# new direction
 		for i in range(self.nsteps):
 			self.proposer.new_chain(ui, ndim, live_pointsu, is_inside_unit_filter)
@@ -290,6 +291,7 @@ class SliceConstrainer(object):
 				u = self.proposer.propose(ui, ndim, live_pointsu, is_inside_unit_filter)
 				x = priortransform(u)
 				L = loglikelihood(x)
+				nevals += 1
 				# MH accept rule
 				# accept = L > Li or numpy.random.uniform() < exp(L - Li)
 				# Likelihood-difference independent, because we do
@@ -316,7 +318,7 @@ class SliceConstrainer(object):
 			assert numpy.all(Li < Lmins), (Li, Lmins, self.nmaxsteps, numpy.mean(self.proposer.accepts), len(self.proposer.accepts))
 		if xi is None:
 			xi = priortransform(ui)
-		return ui, xi, Li, n
+		return ui, xi, Li, nevals
 
 	def stats(self):
 		return self.proposer.stats()
