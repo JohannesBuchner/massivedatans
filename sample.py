@@ -188,6 +188,7 @@ sampler = MultiNestedSampler(nlive_points = nlive_points,
 	nsuperset_draws = int(os.environ.get('SUPERSET_DRAWS', '10')),
 	use_graph = os.environ.get('USE_GRAPH', '1') == '1'
 )
+sampler.optimized = False
 
 superset_constrainer.sampler = sampler
 cc.sampler = sampler

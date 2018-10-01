@@ -22,6 +22,7 @@ from numpy import exp, log, log10, pi
 import progressbar
 import igraph
 from collections import defaultdict
+import time
 
 status_symbols = {
 	0:' ', 
@@ -45,6 +46,8 @@ def find_nsmallest(n, arr1, arr2):
 	# new version, faster because it does not need to sort everything
 	arr = numpy.concatenate((arr1, arr2))
 	return numpy.partition(arr, n)[n]
+
+logfile_graph = open('logfile_graph.txt', 'a')
 
 class MultiNestedSampler(object):
 	"""
@@ -71,6 +74,7 @@ class MultiNestedSampler(object):
 		self.ndim = ndim
 		self.ndata = ndata
 		self.superpoints = []
+		self.optimized = True
 		# lazy building of graph
 		self.use_graph = use_graph
 		self.membership_graph = None
@@ -258,7 +262,7 @@ class MultiNestedSampler(object):
 			member_data_mask[members] = True
 			#print 'returning:', member_data_mask, member_live_pointsp
 			yield member_data_mask, member_live_pointsp
-
+	
 	def generate_subsets_graph(self, data_mask, allp):
 		# generate data subsets which share points.
 		selected = numpy.where(data_mask)[0]
@@ -273,22 +277,31 @@ class MultiNestedSampler(object):
 		if not all_selected:
 			allp = numpy.unique(self.live_pointsp[:,selected].flatten())
 		
+		build_optional = 0
 		if len(allp) < 2 * self.nlive_points:
 			print('generate_subsets: only %d unique live points known, so connected' % len(allp))
-			# if fewer than 2*nlive unique points are known, 
-			# some must be shared between data sets.
-			# So no disjoint data sets
-			yield data_mask, allp
-			return
+			if self.optimized:
+				# if fewer than 2*nlive unique points are known, 
+				# some must be shared between data sets.
+				# So no disjoint data sets
+				yield data_mask, allp
+				return
+			build_optional += 1
 		
 		if len(self.superpoints) > 0:
 			print('generate_subsets: %d superpoints known, so connected' % len(self.superpoints))
-			# there are some points shared by all data sets
-			# so no disjoint data sets
-			yield data_mask, allp
-			return
+			if self.optimized:
+				# there are some points shared by all data sets
+				# so no disjoint data sets
+				yield data_mask, allp
+				return
+			build_optional += 10
 		
+		t_start = time.time()
 		self.rebuild_graph()
+		t_end = time.time()
+		logfile_graph.write("%d\t%d\t%.f\n" % (self.global_iter, build_optional, t_end - t_start))
+		
 		if all_selected:
 			graph = self.membership_graph
 		else:
