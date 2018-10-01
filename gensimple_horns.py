@@ -48,9 +48,9 @@ colors = ['yellow', 'pink', 'cyan', 'magenta']
 colors = ['magenta', 'cyan', 'pink', 'yellow']
 for i in range(min(N, 4)):
 	#plt.plot(x, y[:,i], '.-')
-	plt.plot(rest_wave * (1 + z[i]), 1.1 * y[:,i].max() / noise_level, 'v', color=colors[i], ms=12)
+	plt.plot(rest_wave * (1 + z[i]), 1.1 * y[:,i].max() / noise_level, 'v', color=colors[i], ms=12, mew=0.5, mec='k')
 	#plt.plot(rest_wave * (1 + z[i]), 4, 'v', color=colors[i], ms=12)
-	plt.plot(x, y[:,i] / noise_level, '-', color=colors[i])
+	plt.plot(x, y[:,i] / noise_level, '-', color=colors[i], lw=1)
 plt.ylabel('Detector signal')
 plt.xlabel('Wavelength [nm]')
 plt.savefig('genhorns.pdf', bbox_inches='tight')
