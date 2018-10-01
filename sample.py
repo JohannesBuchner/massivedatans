@@ -197,9 +197,9 @@ min_samples = int(os.environ.get('MINSAMPLES', 0))
 results = multi_nested_integrator(tolerance=0.5, multi_sampler=sampler, min_samples=min_samples, max_samples=max_samples)
 duration = time.time() - start_time
 print('writing output files ...')
-prefix = '%s_%s_nlive%d' % (sys.argv[1], constrainer_type, nlive_points)
+prefix = '%s_%s_nlive%d_%d.out8' % (sys.argv[1], constrainer_type, nlive_points, ndata)
 # store results
-with h5py.File(prefix + '.out8.hdf5', 'w') as f:
+with h5py.File(prefix + '.hdf5', 'w') as f:
 	f.create_dataset('logZ', data=results['logZ'], compression='gzip', shuffle=True)
 	f.create_dataset('logZerr', data=results['logZerr'], compression='gzip', shuffle=True)
 	u, x, L, w, mask = list(zip(*results['weights']))
@@ -214,7 +214,7 @@ with h5py.File(prefix + '.out8.hdf5', 'w') as f:
 
 print('writing statistic ...')
 json.dump(dict(ndraws=sampler.ndraws, duration=duration, ndata=ndata, niter=len(w)), 
-	open(prefix + '_%d.out8.stats.json' % ndata, 'w'), indent=4)
+	open(prefix + '.stats.json', 'w'), indent=4)
 print('done.')
 
 
