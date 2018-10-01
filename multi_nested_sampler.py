@@ -308,7 +308,7 @@ class MultiNestedSampler(object):
 		for sub_data_mask, sub_points in self._generate_subsets_graph_subgraphs(graph, data_mask, all_selected, allp):
 			yield sub_data_mask, sub_points
 		t_end = time.time()
-		logfile_graph.write("%d\t%d\t%.f\n" % (self.global_iter, build_optional, t_end - t_start))
+		logfile_graph.write("%d\t%d\t%f\n" % (self.global_iter, build_optional, t_end - t_start))
 	
 	def _generate_subsets_graph_create_subgraph(self, data_mask, allp):
 		# need to look at the subgraph with only the selected
