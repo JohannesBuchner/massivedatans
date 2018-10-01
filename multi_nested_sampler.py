@@ -299,14 +299,14 @@ class MultiNestedSampler(object):
 		
 		t_start = time.time()
 		self.rebuild_graph()
-		t_end = time.time()
-		logfile_graph.write("%d\t%d\t%.f\n" % (self.global_iter, build_optional, t_end - t_start))
 		
 		if all_selected:
 			graph = self.membership_graph
 		else:
 			graph = self._generate_subsets_graph_create_subgraph(data_mask, allp)
 		
+		t_end = time.time()
+		logfile_graph.write("%d\t%d\t%.f\n" % (self.global_iter, build_optional, t_end - t_start))
 		for sub_data_mask, sub_points in self._generate_subsets_graph_subgraphs(graph, data_mask, all_selected, allp):
 			yield sub_data_mask, sub_points
 	
