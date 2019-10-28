@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import sys
 import time
@@ -74,7 +75,7 @@ def generate_subsets_graph(data_mask, live_pointsp, graph, _):
 	
 	# then identify disjoint subgraphs
 	for subgraph in subgraphs:
-		print 'networkx subgraph:', subgraph.nodes()
+		print('networkx subgraph:', subgraph.nodes())
 		member_data_mask = numpy.zeros(len(data_mask), dtype=bool)
 		member_live_pointsp = []
 		for nodetype, i in subgraph.nodes():
@@ -134,21 +135,21 @@ for filename in sys.argv[1:]:
 	
 	data_sets.append((data_mask, live_pointsp, graph, graph2))
 t1 = time.time()
-print 'loading took %fs' % (t1 - t0)
+print('loading took %fs' % (t1 - t0))
 
 prev_output = []
 for implementation in [generate_subsets_reference, generate_subsets_graph_simple, generate_subsets_graph, generate_subsets_igraph]:
-	print 'running', implementation
+	print('running', implementation)
 	output = []
 	t0 = time.time()
 	for a, b, graph, graph2 in data_sets:
 		out = list(implementation(a, b, graph, graph2))
 		output.append(out)
 	t1 = time.time()
-	print '   took %fs' % (t1 - t0)
+	print('   took %fs' % (t1 - t0))
 	#for a, b in  zip(output, 
 	if prev_output != []:
-		print 'checking for correctness...'
+		print('checking for correctness...')
 		for memberlist1, memberlist2 in zip(output, prev_output):
 			memberlist1 = sorted(memberlist1, key=lambda ml: (len(ml), ml[0][0]))
 			memberlist2 = sorted(memberlist2, key=lambda ml: (len(ml), ml[0][0]))

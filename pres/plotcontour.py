@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import matplotlib.pyplot as plt
 #from nested_sampling.clustering.neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
@@ -32,7 +33,7 @@ x = numpy.linspace(-2.5, 6.5, 100)
 y = numpy.linspace(-2.5, 6.5, 100)
 X, Y = numpy.meshgrid(x, y)
 XY = numpy.array(numpy.transpose([X.flatten(), Y.flatten()]), order='C')
-print XY.dtype
+print(XY.dtype)
 L = likelihood(X, Y)
 Lsorted = L[30:-30,30:-30].flatten()
 Lsorted.sort()

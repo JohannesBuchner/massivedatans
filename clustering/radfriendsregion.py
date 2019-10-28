@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 RadFriends region with transforms
@@ -17,7 +18,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 import numpy
 import scipy.spatial, scipy.cluster
-from neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
+from .neighbors import find_rdistance, is_within_distance_of, count_within_distance_of, any_within_distance_of
 from collections import defaultdict
 
 class ClusterResult(object):
@@ -26,10 +27,10 @@ class ClusterResult(object):
 		self.clusters = clusters
 		self.metric = metric
 		if verbose:
-			print 'CLUSTERS:'
+			print('CLUSTERS:')
 			for cluster in clusters:
 				clusterpoints = metric.untransform(points[cluster,:])
-				print 'CLUSTER:', clusterpoints.mean(axis=0), clusterpoints.std(axis=0)
+				print('CLUSTER:', clusterpoints.mean(axis=0), clusterpoints.std(axis=0))
 	
 	def get_cluster_id(self, point):
 		w = self.metric.transform(point)
@@ -107,7 +108,7 @@ class RadFriendsRegion(object):
 			for j in neighbors:
 				cluster[j] = cluster[i]
 		result = defaultdict(list)
-		for element, cluster_nro in cluster.items():
+		for element, cluster_nro in list(cluster.items()):
 			result[cluster_nro].append(element)
 		#print 'RadFriends: %d clusters' % len(result)
 		return result
@@ -146,11 +147,11 @@ class RadFriendsRegion(object):
 			us = members[numpy.random.randint(0, len(members), N),:]
 			ntotal = ntotal + N
 			nall += N
-			if verbose: print 'chosen point', us
+			if verbose: print('chosen point', us)
 			# draw direction around it
 			direction = numpy.random.normal(0, 1, size=(N, ndim))
 			direction = direction / ((direction**2).sum(axis=1)**0.5).reshape((-1,1))
-			if verbose: print 'chosen direction', direction
+			if verbose: print('chosen direction', direction)
 			# choose radius: volume gets larger towards the outside
 			# so give the correct weight with dimensionality
 			radius = maxdistance * numpy.random.uniform(0, 1, size=(N,1))**(1./ndim)
@@ -163,14 +164,14 @@ class RadFriendsRegion(object):
 			#if verbose: print 'using point', us
 			# count the number of points this is close to
 			nnear = self.count_nearby_members(us)
-			if verbose: print 'near', nnear
+			if verbose: print('near', nnear)
 			# accept with probability 1./nnear
 			coin = numpy.random.uniform(size=len(us))
 			
 			accept = coin < 1. / nnear
 			#print 'accepted %d/%d [point draw]' % (accept.sum(), N)
 			if not accept.any():
-				if verbose: print 'probabilistic rejection due to overlaps'
+				if verbose: print('probabilistic rejection due to overlaps')
 				continue
 			#print '  overlaps accepted %d of %d, typically %.2f neighbours' % (accept.sum(), N, nnear.mean())
 			us = us[accept,:]

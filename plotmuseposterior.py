@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import json
 import numpy
 from numpy import log, log10, arctan, pi, exp
@@ -7,18 +8,15 @@ import h5py
 import scipy.stats
 import corner
 
-def interpolate(grid, v):
-	vi = v.astype(int)
-	vi[vi == len(grid)] = len(grid) - 1
-	return grid[vi]
-
 filename = sys.argv[1]
 with h5py.File(filename, 'r') as f:
 	logZ = f['logZ'].value
 	for i in range(len(logZ)):
-		print '   %d ...' % i
+		print('   %d ...' % i)
 		w = f['w'][:,i] + f['L'][:,i]
 		mask = numpy.isfinite(w)
+		if mask.sum() < 4000:
+			continue
 		jparent = numpy.where(mask)[0]
 		w = w[jparent]
 		#print w, w.min(), w.max()
@@ -26,12 +24,12 @@ with h5py.File(filename, 'r') as f:
 		w = w / w.sum()
 		j = numpy.random.choice(jparent, size=100000, p=w)
 		
-		O = f['x'][:,i,0][j]
+		O = numpy.log10(f['x'][:,i,0][j])
 		Z = f['x'][:,i,1][j]
 		SFtau = f['x'][:,i,2][j]
-		SFage = f['x'][:,i,3][j]
+		SFage = numpy.log10(f['x'][:,i,3][j])
 		EBV = f['x'][:,i,4][j]
-		print w.shape, O.shape, Z.shape, SFtau.shape, SFage.shape, EBV.shape
+		print(w.shape, O.shape, Z.shape, SFtau.shape, SFage.shape, EBV.shape)
 		data = numpy.transpose([O, Z, SFtau, SFage, EBV])
 		
 		# make marginal plots

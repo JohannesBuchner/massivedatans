@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import json
 import numpy
 from numpy import log

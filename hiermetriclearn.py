@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Implementation of RadFriends
@@ -52,14 +53,14 @@ class MetricLearningFriendsConstrainer(object):
 			if self.force_shrink and self.region.maxdistance > self.prev_maxdistance:
 				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
 			self.prev_maxdistance = self.region.maxdistance
-			print 'keeping metric, not reclustering.'
+			print('keeping metric, not reclustering.')
 			return
 		
 		metric_updated = False
 		clustermetric = self.metric
-		print 'computing distances for clustering...'
+		print('computing distances for clustering...')
 		# Overlay all clusters (shift by cluster mean) 
-		print 'Metric update ...'
+		print('Metric update ...')
 		cluster_mean = numpy.mean(u, axis=0)
 		shifted_cluster_members = u - cluster_mean
 		
@@ -81,14 +82,14 @@ class MetricLearningFriendsConstrainer(object):
 		self.metric = metric
 		
 		wnew = self.metric.transform(u)
-		print 'Region update ...'
+		print('Region update ...')
 		
 		self.region = RadFriendsRegion(members=wnew) #, maxdistance=shifted_region.maxdistance)
 		if not metric_updated and self.force_shrink and self.prev_maxdistance is not None:
 			if self.region.maxdistance > self.prev_maxdistance:
 				self.region = RadFriendsRegion(members=w, maxdistance=self.prev_maxdistance)
 		self.prev_maxdistance = self.region.maxdistance
-		print 'done.'
+		print('done.')
 	
 	def are_inside_cluster(self, points):
 		w = self.metric.transform(points)
@@ -145,7 +146,7 @@ class MetricLearningFriendsConstrainer(object):
 		self.cluster(u=u, ndim=ndim, keepMetric=keepMetric)
 		self.last_cluster_points = u
 		
-		print 'maxdistance:', self.region.maxdistance
+		print('maxdistance:', self.region.maxdistance)
 		self.generator = self.generate(ndim)
 	
 	def _draw_constrained_prepare(self, Lmins, priortransform, loglikelihood, live_pointsu, ndim, **kwargs):
@@ -153,7 +154,7 @@ class MetricLearningFriendsConstrainer(object):
 		rebuild_metric = self.iter_since_metric_rebuild > self.metric_rebuild_every
 		keepMetric = not rebuild_metric
 		if rebuild:
-			print 'rebuild triggered at call'
+			print('rebuild triggered at call')
 			self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=keepMetric)
 			self.ndraws_since_rebuild = 0
 			if rebuild_metric:
@@ -198,13 +199,13 @@ class MetricLearningFriendsConstrainer(object):
 				#     if we haven't done so at the start
 				if not rebuild and self.ndraws_since_rebuild > self.rebuild_every:
 					rebuild = True
-					print 'RadFriends rebuild triggered after %d draws' % self.ndraws_since_rebuild
+					print('RadFriends rebuild triggered after %d draws' % self.ndraws_since_rebuild)
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=True)
 					self.ndraws_since_rebuild = 0
 					break
 				if not rebuild_metric and ntoaccept > 200:
 					rebuild_metric = True
-					print 'RadFriends metric rebuild triggered after %d draws' % self.ndraws_since_rebuild
+					print('RadFriends metric rebuild triggered after %d draws' % self.ndraws_since_rebuild)
 					self.rebuild(numpy.asarray(live_pointsu), ndim, keepMetric=False)
 					self.iter_since_metric_rebuild = 0
 					break

@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import matplotlib.pyplot as plt
 import h5py
@@ -22,8 +23,8 @@ rest_wave = 440
 # in km/s
 width_broad = 10**numpy.random.normal(3, 0.2, size=N) * rest_wave / 300000
 width_narrow = 10**numpy.random.normal(1, 0.2, size=N) * rest_wave / 300000
-print width_narrow.min()
-print width_broad.min()
+print(width_narrow.min())
+print(width_broad.min())
 # convert to nm
 mean_broad  = rest_wave * numpy.ones(N)
 mean_narrow = rest_wave * numpy.ones(N)
@@ -42,19 +43,19 @@ height_narrow = signal_level
 ym =  gauss(A=height_broad, mu=mean_broad, x=x, z=z, sig=width_broad)
 ym += gauss(A=height_narrow, mu=mean_narrow, x=x, z=z, sig=width_narrow)
 ym = numpy.transpose(ym)
-print ym.shape
+print(ym.shape)
 
 # add noise
-print 'adding noise'
+print('adding noise')
 y = numpy.random.normal(0, noise_level, size=ym.shape) + ym
-print 'plotting ...'
+print('plotting ...')
 for i in range(min(N, 20)):
 	#plt.plot(x, y[:,i], '.-')
 	plt.plot(x, y[:,i], '-')
 plt.savefig('gen.pdf', bbox_inches='tight')
 plt.close()
 
-print x.shape, y.shape, z.shape
+print(x.shape, y.shape, z.shape)
 with h5py.File('data.hdf5', 'w') as f:
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('y', data=y, compression='gzip', shuffle=True)

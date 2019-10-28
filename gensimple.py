@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import numpy
 import matplotlib.pyplot as plt
 import h5py
@@ -21,7 +22,7 @@ alpha, beta, scale = 2., 7., 1
 z = numpy.random.beta(alpha, beta, size=N) * scale
 #z = numpy.zeros(N) + 0.01
 rest_wave = 440
-print 'generating parameters ...'
+print('generating parameters ...')
 # in km/s
 width_broad = 4000 * rest_wave / 300000 * numpy.ones(N)
 width_narrow = 400 * rest_wave / 300000 * numpy.ones(N)
@@ -42,19 +43,19 @@ height_narrow = signal_level
 
 #X = numpy.array([x])
 
-print 'generating signal ...'
+print('generating signal ...')
 ym =  gauss(A=height_broad, mu=mean_broad, x=x, z=z, sig=width_broad)
 ym += gauss(A=height_narrow, mu=mean_narrow, x=x, z=z, sig=width_narrow)
 ym = numpy.transpose(ym)
-print ym.shape
+print(ym.shape)
 
 # add noise
-print 'adding noise...'
+print('adding noise...')
 y = ym.copy()
 for i in range(N):
 	y[:,i] += numpy.random.normal(0, noise_level, size=len(x))
 
-print 'plotting ...'
+print('plotting ...')
 for i in range(min(N, 20)):
 	#plt.plot(x, y[:,i], '.-')
 	plt.plot(x, y[:,i], '-')

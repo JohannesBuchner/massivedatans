@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Geometry learning algorithms
@@ -15,7 +16,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 """
 
-from __future__ import absolute_import
+
 import numpy as np
 import numpy
 from numpy import exp

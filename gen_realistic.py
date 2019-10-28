@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import sys
 import numpy
 import matplotlib.pyplot as plt
@@ -42,22 +43,22 @@ height_narrow = signal_level
 ym =  gauss(A=height_broad, mu=mean_broad, x=x, z=z, sig=width_broad)
 ym += gauss(A=height_narrow, mu=mean_narrow, x=x, z=z, sig=width_narrow)
 ym = numpy.transpose(ym)
-print ym.shape
+print(ym.shape)
 
 # add noise
-print 'adding noise'
+print('adding noise')
 y = numpy.random.normal(0, noise_level, size=ym.shape) + ym
-print 'truncating ...'
+print('truncating ...')
 N = int(sys.argv[1])
 y = y[:,:N]
-print 'plotting ...'
+print('plotting ...')
 for i in range(min(N, 20)):
 	#plt.plot(x, y[:,i], '.-')
 	plt.plot(x, y[:,i], '-')
 plt.savefig('gen_realistic.pdf', bbox_inches='tight')
 plt.close()
 
-print x.shape, y.shape, z.shape
+print(x.shape, y.shape, z.shape)
 with h5py.File('data_realistic_%d.hdf5' % N, 'w') as f:
 	f.create_dataset('x', data=x, compression='gzip', shuffle=True)
 	f.create_dataset('y', data=y, compression='gzip', shuffle=True)

@@ -30,59 +30,36 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 #define sqr(x) (pow(x,2))
 
 // Parallelisation does not work at the moment, you are welcome to fix it
-
+// ret = lib.like(yd, vd, ypred, data_mask, ndata, nspec, Lout)
 int like(
-	const void * xp, const void * yyp, const int ndata, const int nx,
-	const double A, const double mu, const double sig,
-	const double noise_level,
-	const void * data_maskp, 
+	const void * yyp, const void * vvp, const void * ypredp, const void * data_maskp, 
+	const int ndata, const int nx,
 	void * Loutp
 ) {
-	const adouble * x = (const adouble*) xp;
 	const adouble * yy = (const adouble*) yyp;
+	const adouble * vv = (const adouble*) vvp;
+	const adouble * ypred = (const adouble*) ypredp;
 	const bool * data_mask = (const bool*) data_maskp;
 	adouble * Lout = (adouble*) Loutp;
 	
-	{
 	#ifdef PARALLEL
-	int k = 0;
 	#pragma omp parallel for
-	// this is stupid because it does not actually safe model evaluations,
-	// but at least it should run faster for our testing purposes.
+	#endif
 	for (int i = 0; i < ndata; i++) {
 		if (data_mask[i]) {
-			Lout[k] = 0;
+			// compute s
+			double s1 = 0.;
+			double s2 = 1e-10;
 			for (int j = 0; j < nx; j++) {
-				const double ypred = A * exp(-0.5 * sqr((mu - x[j])/sig));
-				IFVERBOSE printf("y %d %d: %f %f\n", i, j, yy[i + j*ndata], ypred);
-				Lout[k] += sqr((ypred - yy[i + j*ndata]) / noise_level);
+				s1 += yy[i+j*ndata] * ypred[j] / vv[i+j*ndata];
+				s2 += pow(ypred[j], 2) / vv[i+j*ndata];
 			}
-			k++;
-		}
-	}
-	#else
-	for (int j = 0; j < nx; j++) {
-		const double ypred = A * exp(-0.5 * sqr((mu - x[j])/sig));
-		
-		int k = 0;
-		for (int i = 0; i < ndata; i++) {
-			IFVERBOSE printf("data_mask %d: %d\n", i, data_mask[i]);
-			if (data_mask[i]) {
-				IFVERBOSE printf("y %d %d: %f %f\n", i, j, yy[i + j*ndata], ypred);
-				Lout[k] += sqr((ypred - yy[i + j*ndata]) / noise_level);
-				k++;
+			double s = s1/s2;
+			double chi = 0.;
+			for (int j = 0; j < nx; j++) {
+				chi += pow(yy[i+j*ndata] - s * ypred[j], 2) / vv[i+j*ndata];
 			}
-		}
-	}
-	#endif
-	}
-	IFVERBOSE {
-		int k = 0;
-		for (int i = 0; i < ndata; i++) {
-			if (data_mask[i]) {
-				printf("L %d: %f\n", k, Lout[k]);
-				k++;
-			}
+			Lout[i] = -0.5 * chi;
 		}
 	}
 	return 0;

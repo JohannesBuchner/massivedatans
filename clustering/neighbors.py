@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 """
 
 Neighbourhood helper functions
@@ -52,10 +53,10 @@ def update_maxdistance(u, ibootstrap, maxdistance, verbose = False):
 			
 			# choose smallest
 			nearest = numpy.argmin(increase)
-			if verbose: print ibootstrap, 'nearest:', u[i], u[nearest], increase[nearest]
+			if verbose: print(ibootstrap, 'nearest:', u[i], u[nearest], increase[nearest])
 			# update maxdistance
 			maxdistance = numpy.where(dists[nearest] > maxdistance, dists[nearest], maxdistance)
-			if verbose: print ibootstrap, 'extending:', maxdistance
+			if verbose: print(ibootstrap, 'extending:', maxdistance)
 		else:
 			# we got this one, everything is fine
 			pass
@@ -63,10 +64,10 @@ def update_maxdistance(u, ibootstrap, maxdistance, verbose = False):
 
 def find_maxdistance(u, verbose=False, nbootstraps=15):
 	# find nearest point for every point
-	if verbose: print 'finding nearest neighbors:'
+	if verbose: print('finding nearest neighbors:')
 	maxdistance = initial_maxdistance_guess(u)
 	#maxdistance = numpy.zeros(ndim)
-	if verbose: print 'initial:', maxdistance
+	if verbose: print('initial:', maxdistance)
 	for ibootstrap in range(nbootstraps):
 		maxdistance = update_maxdistance(u, ibootstrap, maxdistance, verbose=verbose)
 	return maxdistance
@@ -176,9 +177,9 @@ try:
 		return maxdistance
 
 except ImportError as e:
-	print 'Using slow, high-memory neighborhood function nearest_rdistance_guess because import failed:', e
+	print('Using slow, high-memory neighborhood function nearest_rdistance_guess because import failed:', e)
 except Exception as e:
-	print 'Using slow, high-memory neighborhood function nearest_rdistance_guess because:', e
+	print('Using slow, high-memory neighborhood function nearest_rdistance_guess because:', e)
 
 
 def nearest_rdistance_guess(u, metric='euclidean'):
@@ -219,19 +220,19 @@ def update_rdistance(u, ibootstrap, rdistance, verbose = False, metric='euclidea
 	assert distances.shape == (mask.sum(), (-mask).sum())
 	nearest_distance_to_members = distances.min(axis=0)
 	if verbose:
-		print 'nearest distances:', nearest_distance_to_members.max(), nearest_distance_to_members
+		print('nearest distances:', nearest_distance_to_members.max(), nearest_distance_to_members)
 	newrdistance = max(rdistance, nearest_distance_to_members.max())
 	if newrdistance > rdistance and verbose:
-		print ibootstrap, 'extending:', newrdistance
+		print(ibootstrap, 'extending:', newrdistance)
 	return newrdistance
 
 def find_rdistance(u, verbose=False, nbootstraps=15, metric='euclidean'):
 	if metric == 'euclidean' and bootstrapped_maxdistance is not None:
 		return bootstrapped_maxdistance(u, nbootstraps)
 	# find nearest point for every point
-	if verbose: print 'finding nearest neighbors:'
+	if verbose: print('finding nearest neighbors:')
 	rdistance = 0 #initial_rdistance_guess(u)
-	if verbose: print 'initial:', rdistance
+	if verbose: print('initial:', rdistance)
 	for ibootstrap in range(nbootstraps):
 		rdistance = update_rdistance(u, ibootstrap, rdistance, verbose=verbose, metric=metric)
 	return rdistance
@@ -245,6 +246,6 @@ if __name__ == '__main__':
 		a = bootstrapped_maxdistance(u, nbootstraps)
 		numpy.random.seed(i)
 		b = find_rdistance(u, nbootstraps=nbootstraps, metric='euclidean', verbose=False)
-		print a, b
+		print(a, b)
 		assert numpy.allclose(a, b)
 		
